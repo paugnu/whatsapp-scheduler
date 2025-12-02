@@ -146,6 +146,18 @@ function clearSearchBox(searchBox) {
 async function openChatByTitle(title) {
     if (!title) return false;
 
+    const dispatchNuclearClick = (element) => {
+        if (!element) return;
+
+        const opts = { bubbles: true, cancelable: true, composed: true, view: window, buttons: 1 };
+
+        element.dispatchEvent(new PointerEvent("pointerdown", opts));
+        element.dispatchEvent(new MouseEvent("mousedown", opts));
+        element.dispatchEvent(new PointerEvent("pointerup", opts));
+        element.dispatchEvent(new MouseEvent("mouseup", opts));
+        element.dispatchEvent(new MouseEvent("click", opts));
+    };
+
     const tryClickFromList = () => {
         const spans = document.querySelectorAll('div[role="grid"] span[dir="auto"][title], div[role="grid"] span[dir="auto"]');
 
@@ -157,14 +169,22 @@ async function openChatByTitle(title) {
             if (!candidate) continue;
 
             if (namesMatch(title, candidate)) {
-                let row =
+                const row =
                     span.closest('div[role="row"]') ||
                     span.closest('div[role="button"]') ||
                     span.closest('div[aria-label]') ||
                     span;
 
                 console.log("[WA Scheduler] Abriendo chat:", candidate, "(target:", title, ")");
-                row.click();
+
+                // Realiza una ráfaga de eventos sobre el texto, su padre inmediato y la fila
+                dispatchNuclearClick(span);
+                setTimeout(() => dispatchNuclearClick(span.parentElement), 80);
+                setTimeout(() => dispatchNuclearClick(row), 140);
+
+                // Fallback clásico por si React ignora los pointer events
+                setTimeout(() => row.click(), 200);
+
                 return true;
             }
         }

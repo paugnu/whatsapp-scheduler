@@ -14,6 +14,16 @@ let lastSendButton = null;
 let lastChatTitle = null;
 let chatCheckTimeout = null;
 
+// Localizar el input del chat activo (sin usar caché)
+function findActiveComposer() {
+    return (
+        document.querySelector('.lexical-rich-text-input [contenteditable="true"][data-lexical-editor="true"]') ||
+        document.querySelector('[contenteditable="true"][data-lexical-editor="true"]') ||
+        document.querySelector('[contenteditable="true"][data-tab="10"]') ||
+        document.querySelector('[contenteditable="true"]')
+    );
+}
+
 function setLastTargetsFromElement(el) {
     if (!el) return;
     lastInput = el;
@@ -205,6 +215,9 @@ function showToast(msg, type = "info", duration = 3000) {
     }, duration);
 }
 
+// Iniciar sincronización del chat activo
+startChatObserver();
+
 // -------------------------
 // Escribir mensaje y enviarlo
 // -------------------------
@@ -216,11 +229,7 @@ function sendMessageInActiveChat(text) {
         input = lastInput;
         console.log("[WA Scheduler] Usando lastInput");
     } else {
-        input =
-            document.querySelector('.lexical-rich-text-input [contenteditable="true"][data-lexical-editor="true"]') ||
-            document.querySelector('[contenteditable="true"][data-lexical-editor="true"]') ||
-            document.querySelector('[contenteditable="true"][data-tab="10"]') ||
-            document.querySelector('[contenteditable="true"]');
+        input = findActiveComposer();
 
         if (input) {
             console.log("[WA Scheduler] Detectado nuevo input lexical");
@@ -330,6 +339,10 @@ function sendToScheduledChat(id, text, chatTitle) {
 
         if (current && namesMatch(chatTitle, current)) {
             console.log("[WA Scheduler] Chat correcto abierto, enviando mensaje");
+            const composer = findActiveComposer();
+            if (composer) {
+                setLastTargetsFromElement(composer);
+            }
             try {
                 sendMessageInActiveChat(text);
                 browser.runtime.sendMessage({
@@ -363,6 +376,36 @@ function sendToScheduledChat(id, text, chatTitle) {
     }
 
     setTimeout(waitForChat, 700);
+}
+
+// -------------------------
+// Mantener sincronizado el input con el chat activo
+// -------------------------
+
+function startChatObserver() {
+    const updateTargetsForChat = () => {
+        const current = getActiveChatTitle();
+        if (current && current !== lastChatTitle) {
+            lastChatTitle = current;
+            lastInput = null;
+            lastSendButton = null;
+
+            const composer = findActiveComposer();
+            if (composer) {
+                setLastTargetsFromElement(composer);
+            }
+        }
+    };
+
+    // Observador ligero del header
+    const header = document.querySelector("header");
+    if (header) {
+        const mo = new MutationObserver(() => updateTargetsForChat());
+        mo.observe(header, { childList: true, subtree: true, characterData: true });
+    }
+
+    // Fallback periódico por si el observer no detecta cambios
+    setInterval(updateTargetsForChat, 1500);
 }
 
 // -------------------------

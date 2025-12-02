@@ -1,0 +1,23 @@
+{
+  "manifest_version": 2,
+  "name": "WhatsApp Scheduler",
+  "version": "2.1",
+  "description": "Programa mensajes en WhatsApp Web.",
+  "permissions": [
+    "tabs",
+    "alarms",
+    "storage",
+    "https://web.whatsapp.com/*"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

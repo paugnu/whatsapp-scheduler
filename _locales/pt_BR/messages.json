@@ -1,0 +1,149 @@
+{
+  "extName": {
+    "message": "Agendador do WhatsApp"
+  },
+  "extDescription": {
+    "message": "Agende mensagens no WhatsApp Web."
+  },
+  "toastWriteMessage": {
+    "message": "Escreva uma mensagem"
+  },
+  "toastTextTooLong": {
+    "message": "Mensagem muito longa ($1/4096)"
+  },
+  "toastNeedTime": {
+    "message": "Informe um tempo maior que zero"
+  },
+  "toastScheduledMinutes": {
+    "message": "✓ Mensagem agendada para $1 minuto(s)"
+  },
+  "toastErrorWithDetail": {
+    "message": "Erro: $1"
+  },
+  "toastMessageCancelled": {
+    "message": "Mensagem cancelada"
+  },
+  "errorNoResponse": {
+    "message": "sem resposta"
+  },
+  "panelTitleSchedule": {
+    "message": "📅 Agendar mensagem"
+  },
+  "labelCurrentChat": {
+    "message": "Conversa atual"
+  },
+  "placeholderMessage": {
+    "message": "Escreva sua mensagem (máx. 4096 caracteres)..."
+  },
+  "labelHours": {
+    "message": "Horas"
+  },
+  "labelMinutes": {
+    "message": "Minutos"
+  },
+  "buttonSchedule": {
+    "message": "✓ Agendar"
+  },
+  "buttonList": {
+    "message": "📋 Lista"
+  },
+  "labelEditMessageTitle": {
+    "message": "✏️ Editar mensagem"
+  },
+  "labelChat": {
+    "message": "Conversa"
+  },
+  "labelNoChat": {
+    "message": "(nenhuma conversa especificada)"
+  },
+  "labelMessage": {
+    "message": "Mensagem"
+  },
+  "labelScheduledFor": {
+    "message": "⏰ Agendado para: <strong>$1</strong>"
+  },
+  "buttonSave": {
+    "message": "Salvar"
+  },
+  "buttonCancel": {
+    "message": "Cancelar"
+  },
+  "statusScheduled": {
+    "message": "⏱️ Agendado"
+  },
+  "statusSending": {
+    "message": "📤 Enviando"
+  },
+  "statusSent": {
+    "message": "✅ Enviado"
+  },
+  "statusFailed": {
+    "message": "❌ Erro"
+  },
+  "listEmpty": {
+    "message": "Nenhuma mensagem ainda"
+  },
+  "listError": {
+    "message": "Erro ao carregar a lista"
+  },
+  "buttonEdit": {
+    "message": "✏️ Editar"
+  },
+  "buttonDelete": {
+    "message": "🗑️ Cancelar"
+  },
+  "confirmCancelSend": {
+    "message": "Cancelar este envio agendado?"
+  },
+  "errorTextTooLong": {
+    "message": "Texto muito longo"
+  },
+  "errorNoComposer": {
+    "message": "Nenhuma caixa de texto"
+  },
+  "errorChatNotFound": {
+    "message": "Conversa não encontrada: \"$1\""
+  },
+  "errorChatTimeout": {
+    "message": "Tempo esgotado ao carregar a conversa"
+  },
+  "buttonTooltip": {
+    "message": "Agendar mensagem (Ctrl+Shift+W)"
+  },
+  "errorCreateAlarm": {
+    "message": "Erro ao criar alarme"
+  },
+  "errorMessageNotScheduled": {
+    "message": "A mensagem não está agendada"
+  },
+  "errorMessageNotFound": {
+    "message": "Mensagem não encontrada"
+  },
+  "errorNoWhatsAppTab": {
+    "message": "Nenhuma aba do WhatsApp Web aberta"
+  },
+  "errorFindTab": {
+    "message": "Erro ao procurar a aba do WhatsApp: $1"
+  },
+  "errorContentScriptCommunication": {
+    "message": "Erro ao comunicar com o content script: $1"
+  },
+  "toastLongLimit": {
+    "message": "A mensagem excede 4096 caracteres"
+  },
+  "listTitle": {
+    "message": "Agendados"
+  },
+  "listLoading": {
+    "message": "Carregando..."
+  },
+  "labelChatUnknown": {
+    "message": "(não detectado)"
+  },
+  "toastMessageUpdated": {
+    "message": "✓ Mensagem atualizada"
+  },
+  "listSubtitle": {
+    "message": "Histórico de envios"
+  }
+}

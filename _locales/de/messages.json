@@ -1,0 +1,149 @@
+{
+  "extName": {
+    "message": "WhatsApp Planer"
+  },
+  "extDescription": {
+    "message": "Plane Nachrichten in WhatsApp Web."
+  },
+  "toastWriteMessage": {
+    "message": "Nachricht schreiben"
+  },
+  "toastTextTooLong": {
+    "message": "Nachricht zu lang ($1/4096)"
+  },
+  "toastNeedTime": {
+    "message": "Zeit muss größer als null sein"
+  },
+  "toastScheduledMinutes": {
+    "message": "✓ Nachricht geplant in $1 Minute(n)"
+  },
+  "toastErrorWithDetail": {
+    "message": "Fehler: $1"
+  },
+  "toastMessageCancelled": {
+    "message": "Nachricht abgebrochen"
+  },
+  "errorNoResponse": {
+    "message": "keine Antwort"
+  },
+  "panelTitleSchedule": {
+    "message": "📅 Nachricht planen"
+  },
+  "labelCurrentChat": {
+    "message": "Aktueller Chat"
+  },
+  "placeholderMessage": {
+    "message": "Nachricht schreiben (max. 4096 Zeichen)..."
+  },
+  "labelHours": {
+    "message": "Stunden"
+  },
+  "labelMinutes": {
+    "message": "Minuten"
+  },
+  "buttonSchedule": {
+    "message": "✓ Planen"
+  },
+  "buttonList": {
+    "message": "📋 Liste"
+  },
+  "labelEditMessageTitle": {
+    "message": "✏️ Nachricht bearbeiten"
+  },
+  "labelChat": {
+    "message": "Chat"
+  },
+  "labelNoChat": {
+    "message": "(kein Chat angegeben)"
+  },
+  "labelMessage": {
+    "message": "Nachricht"
+  },
+  "labelScheduledFor": {
+    "message": "⏰ Geplant für: <strong>$1</strong>"
+  },
+  "buttonSave": {
+    "message": "Speichern"
+  },
+  "buttonCancel": {
+    "message": "Abbrechen"
+  },
+  "statusScheduled": {
+    "message": "⏱️ Geplant"
+  },
+  "statusSending": {
+    "message": "📤 Senden"
+  },
+  "statusSent": {
+    "message": "✅ Gesendet"
+  },
+  "statusFailed": {
+    "message": "❌ Fehler"
+  },
+  "listEmpty": {
+    "message": "Noch keine Nachrichten"
+  },
+  "listError": {
+    "message": "Fehler beim Laden der Liste"
+  },
+  "buttonEdit": {
+    "message": "✏️ Bearbeiten"
+  },
+  "buttonDelete": {
+    "message": "🗑️ Abbrechen"
+  },
+  "confirmCancelSend": {
+    "message": "Diesen geplanten Versand abbrechen?"
+  },
+  "errorTextTooLong": {
+    "message": "Text zu lang"
+  },
+  "errorNoComposer": {
+    "message": "Kein Textfeld"
+  },
+  "errorChatNotFound": {
+    "message": "Chat nicht gefunden: \"$1\""
+  },
+  "errorChatTimeout": {
+    "message": "Zeitüberschreitung beim Laden des Chats"
+  },
+  "buttonTooltip": {
+    "message": "Nachricht planen (Ctrl+Shift+W)"
+  },
+  "errorCreateAlarm": {
+    "message": "Fehler beim Erstellen des Alarms"
+  },
+  "errorMessageNotScheduled": {
+    "message": "Die Nachricht ist nicht geplant"
+  },
+  "errorMessageNotFound": {
+    "message": "Nachricht nicht gefunden"
+  },
+  "errorNoWhatsAppTab": {
+    "message": "Kein WhatsApp Web-Tab geöffnet"
+  },
+  "errorFindTab": {
+    "message": "Fehler beim Suchen des WhatsApp-Tabs: $1"
+  },
+  "errorContentScriptCommunication": {
+    "message": "Kommunikationsfehler mit Content-Script: $1"
+  },
+  "toastLongLimit": {
+    "message": "Nachricht überschreitet 4096 Zeichen"
+  },
+  "listTitle": {
+    "message": "Geplant"
+  },
+  "listLoading": {
+    "message": "Wird geladen..."
+  },
+  "labelChatUnknown": {
+    "message": "(nicht erkannt)"
+  },
+  "toastMessageUpdated": {
+    "message": "✓ Nachricht aktualisiert"
+  },
+  "listSubtitle": {
+    "message": "Sendeverlauf"
+  }
+}

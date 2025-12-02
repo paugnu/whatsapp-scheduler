@@ -5,6 +5,15 @@ if (typeof browser === "undefined") {
 
 console.log("[BG] Background script iniciado");
 
+// Localización con fallback
+function t(key, substitutions = []) {
+    try {
+        return browser?.i18n?.getMessage(key, substitutions) || key;
+    } catch (e) {
+        return key;
+    }
+}
+
 // Estado en memoria
 let scheduledMessages = {};
 const MAX_RETRIES = 3;
@@ -65,7 +74,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
             const when = Date.now() + message.delayMs;
 
             if (message.text.length > 4096) {
-                throw new Error("Mensaje excede 4096 caracteres");
+                throw new Error(t("toastLongLimit"));
             }
 
             scheduledMessages[id] = {
@@ -90,9 +99,9 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
             } catch (e) {
                 console.error("[BG] Error creando alarma:", e);
                 scheduledMessages[id].status = "failed";
-                scheduledMessages[id].lastError = "Error al crear alarma: " + e;
+                scheduledMessages[id].lastError = t("errorCreateAlarm") + ": " + e;
                 saveMessages();
-                sendResponse({ ok: false, error: "Error al crear alarma" });
+                sendResponse({ ok: false, error: t("errorCreateAlarm") });
                 return true;
             }
 
@@ -155,9 +164,9 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 sendResponse({ ok: false, error: String(e) });
             }
         } else {
-            sendResponse({ 
-                ok: false, 
-                error: msg ? "El mensaje no está en estado programado" : "Mensaje no encontrado" 
+            sendResponse({
+                ok: false,
+                error: msg ? t("errorMessageNotScheduled") : t("errorMessageNotFound")
             });
         }
         return true;
@@ -190,9 +199,9 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 sendResponse({ ok: false, error: String(e) });
             }
         } else {
-            sendResponse({ 
-                ok: false, 
-                error: msg ? "El mensaje no está en estado programado" : "Mensaje no encontrado" 
+            sendResponse({
+                ok: false,
+                error: msg ? t("errorMessageNotScheduled") : t("errorMessageNotFound")
             });
         }
         return true;
@@ -230,7 +239,7 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
         tabs = await browser.tabs.query({ url: "*://web.whatsapp.com/*" });
     } catch (e) {
         msg.status = "failed";
-        msg.lastError = "Error buscando pestaña de WhatsApp: " + e;
+        msg.lastError = t("errorFindTab", [e]);
         await saveMessages();
         console.error("[BG] Error en query tabs:", e);
         return;
@@ -238,7 +247,7 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
 
     if (!tabs || tabs.length === 0) {
         msg.status = "failed";
-        msg.lastError = "No hay pestaña de WhatsApp Web abierta";
+        msg.lastError = t("errorNoWhatsAppTab");
         await saveMessages();
         console.warn("[BG]", msg.lastError);
         return;
@@ -258,7 +267,7 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
         console.log("[BG] Mensaje enviado al content-script");
     } catch (err) {
         msg.status = "failed";
-        msg.lastError = "Error comunicando con content-script: " + String(err);
+        msg.lastError = t("errorContentScriptCommunication", [String(err)]);
         await saveMessages();
         console.error("[BG] Error:", err);
     }

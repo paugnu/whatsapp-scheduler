@@ -6,6 +6,34 @@ if (typeof browser === "undefined") {
 console.log("[WA Scheduler] content-script cargado");
 
 // -------------------------
+// Utilidades base
+// -------------------------
+
+const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+
+// CLICK NUCLEAR: Dispara eventos pointer + mouse para satisfacer a React
+function superClick(element) {
+    if (!element) return;
+    const opts = { bubbles: true, cancelable: true, view: window, buttons: 1 };
+    const events = ["pointerdown", "mousedown", "pointerup", "mouseup", "click"];
+
+    events.forEach((eventType) => {
+        const Ctor = eventType.startsWith("pointer") ? PointerEvent : MouseEvent;
+        element.dispatchEvent(new Ctor(eventType, opts));
+    });
+}
+
+// Escribe texto en inputs contenteditable simulando pegado
+function triggerInputEvent(element, value) {
+    if (!element) return;
+    element.focus();
+    const success = document.execCommand("insertText", false, value);
+    if (!success) element.textContent = value;
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+// -------------------------
 // Estado: último textarea y botón asociados
 // -------------------------
 
@@ -68,28 +96,22 @@ document.addEventListener(
 );
 
 // -------------------------
-// Detectar título del chat actual
+// Detectar título del chat actual (solo panel derecho #main)
 // -------------------------
 
 function getActiveChatTitle() {
-    const selectors = [
-        'header [data-testid="conversation-info-header-chat-title"]',
-        'header span[dir="auto"][title]',
-        'header h2[dir="auto"]',
-        'header [role="heading"] span[dir="auto"]',
-        'header [role="heading"][dir="auto"]',
-        'header div[role="button"] span[dir="auto"]'
-    ];
+    const mainHeader = document.querySelector("#main header");
+    if (!mainHeader) return null;
 
-    for (const sel of selectors) {
-        const el = document.querySelector(sel);
-        if (el) {
-            const attr = el.getAttribute("title");
-            const txt = (el.textContent || "").trim();
-            if (attr && attr.trim()) return attr.trim();
-            if (txt) return txt;
-        }
-    }
+    const elTestId = mainHeader.querySelector('[data-testid="conversation-info-header-chat-title"]');
+    if (elTestId) return elTestId.getAttribute("title") || elTestId.textContent;
+
+    const elTitle = mainHeader.querySelector('span[dir="auto"][title]');
+    if (elTitle) return elTitle.getAttribute("title");
+
+    const elText = mainHeader.querySelector('span[dir="auto"]');
+    if (elText) return elText.textContent;
+
     return null;
 }
 
@@ -100,6 +122,7 @@ function getActiveChatTitle() {
 function normalizeName(s) {
     return (s || "")
         .replace(/\s+/g, " ")
+        .replace(/[\u200B-\u200D\uFEFF]/g, "")
         .trim()
         .toLowerCase();
 }
@@ -107,34 +130,16 @@ function normalizeName(s) {
 function namesMatch(target, candidate) {
     const t = normalizeName(target);
     const c = normalizeName(candidate);
+
     if (!t || !c) return false;
     if (t === c) return true;
-    if (c.startsWith(t) || t.startsWith(c)) return true;
+    if (c.includes(t)) return true;
     return false;
 }
 
 // -------------------------
 // Abrir chat por título
 // -------------------------
-
-function sleep(ms) {
-    return new Promise((res) => setTimeout(res, ms));
-}
-
-function findChatSearchBox() {
-    const selectors = [
-        '[data-testid="chat-list-search"] [contenteditable="true"]',
-        'div[role="textbox"][contenteditable="true"][data-tab="3"]',
-        'div[role="textbox"][contenteditable="true"][data-tab="2"]',
-        'div[contenteditable="true"][title]'
-    ];
-
-    for (const sel of selectors) {
-        const el = document.querySelector(sel);
-        if (el) return el;
-    }
-    return null;
-}
 
 function clearSearchBox(searchBox) {
     if (!searchBox) return;
@@ -143,106 +148,70 @@ function clearSearchBox(searchBox) {
     document.execCommand("delete", false, null);
 }
 
-async function openChatByTitle(title) {
+function openChatByTitle(title) {
     if (!title) return false;
 
-    const dispatchNuclearClick = (element) => {
-        if (!element) return;
+    const sidePane = document.getElementById("pane-side") || document.body;
+    const candidates = sidePane.querySelectorAll('span[dir="auto"]');
 
-        const opts = { bubbles: true, cancelable: true, composed: true, view: window, buttons: 1 };
+    for (const span of candidates) {
+        const text = span.textContent || span.getAttribute("title");
+        if (!text) continue;
 
-        element.dispatchEvent(new PointerEvent("pointerdown", opts));
-        element.dispatchEvent(new MouseEvent("mousedown", opts));
-        element.dispatchEvent(new PointerEvent("pointerup", opts));
-        element.dispatchEvent(new MouseEvent("mouseup", opts));
-        element.dispatchEvent(new MouseEvent("click", opts));
-    };
+        if (namesMatch(title, text)) {
+            const row = span.closest('div[role="row"]') || span.closest('div[role="button"]');
 
-    const tryClickFromList = () => {
-        const spans = document.querySelectorAll('div[role="grid"] span[dir="auto"][title], div[role="grid"] span[dir="auto"]');
+            if (row) {
+                console.log(`[WA Scheduler] Chat encontrado: "${text}". Abriendo...`);
+                row.scrollIntoView({ block: "center", behavior: "instant" });
 
-        for (const span of spans) {
-            const tAttr = span.getAttribute("title");
-            const tText = (span.textContent || "").trim();
-            const candidate = tAttr || tText;
-
-            if (!candidate) continue;
-
-            if (namesMatch(title, candidate)) {
-                const row =
-                    span.closest('div[role="row"]') ||
-                    span.closest('div[role="button"]') ||
-                    span.closest('div[aria-label]') ||
-                    span;
-
-                console.log("[WA Scheduler] Abriendo chat:", candidate, "(target:", title, ")");
-
-                // Realiza una ráfaga de eventos sobre el texto, su padre inmediato y la fila
-                dispatchNuclearClick(span);
-                setTimeout(() => dispatchNuclearClick(span.parentElement), 80);
-                setTimeout(() => dispatchNuclearClick(row), 140);
-
-                // Fallback clásico por si React ignora los pointer events
-                setTimeout(() => row.click(), 200);
+                superClick(span);
+                superClick(row);
 
                 return true;
             }
         }
-        return false;
-    };
+    }
+    return false;
+}
 
-    // Si ya está abierto, no hagas nada
-    const current = getActiveChatTitle();
-    if (current && namesMatch(title, current)) {
+async function searchAndOpenChat(title) {
+    console.log("[WA Scheduler] Chat oculto, usando buscador:", title);
+
+    let searchInput = document.querySelector('div[contenteditable="true"][data-tab="3"]');
+
+    if (!searchInput) {
+        const searchBtn = document.querySelector('[data-icon="search"]')?.closest('div[role="button"]');
+        if (searchBtn) {
+            superClick(searchBtn);
+            await delay(400);
+            searchInput = document.querySelector('div[contenteditable="true"][data-tab="3"]');
+        }
+    }
+
+    if (!searchInput) {
+        console.error("[WA Scheduler] No se encontró buscador");
+        return false;
+    }
+
+    searchInput.focus();
+    document.execCommand("selectAll", false, null);
+    document.execCommand("delete", false, null);
+    triggerInputEvent(searchInput, title);
+
+    await delay(1800);
+
+    const found = openChatByTitle(title);
+
+    if (found) {
+        await delay(1500);
+        const clearBtn =
+            document.querySelector('[data-icon="x-alt"]')?.closest('div[role="button"]') ||
+            document.querySelector('[data-icon="back"]')?.closest('div[role="button"]');
+        if (clearBtn) superClick(clearBtn);
         return true;
     }
 
-    if (tryClickFromList()) return true;
-
-    const searchBox = findChatSearchBox();
-    if (!searchBox) {
-        console.warn("[WA Scheduler] No se encontró el buscador de chats");
-        return false;
-    }
-
-    // Buscar usando el cuadro de búsqueda y seleccionar el primer resultado
-    clearSearchBox(searchBox);
-    document.execCommand("insertText", false, title);
-
-    // Esperar a que aparezcan resultados y probar varios ciclos
-    const maxSearchAttempts = 5;
-    for (let i = 0; i < maxSearchAttempts; i++) {
-        await sleep(400);
-
-        // Si el resultado está visible, selecciónalo
-        if (tryClickFromList()) {
-            setTimeout(() => clearSearchBox(searchBox), 500);
-            return true;
-        }
-
-        // Como fallback, intenta abrir el primer resultado con Enter
-        const firstResult = document.querySelector('[data-testid="cell-frame-container"]');
-        if (firstResult) {
-            firstResult.dispatchEvent(
-                new KeyboardEvent("keydown", {
-                    key: "Enter",
-                    code: "Enter",
-                    keyCode: 13,
-                    which: 13,
-                    bubbles: true,
-                    cancelable: true
-                })
-            );
-            await sleep(300);
-            if (tryClickFromList()) {
-                setTimeout(() => clearSearchBox(searchBox), 500);
-                return true;
-            }
-        }
-    }
-
-    console.warn("[WA Scheduler] No se encontró el chat tras buscar:", title);
-    clearSearchBox(searchBox);
     return false;
 }
 
@@ -324,76 +293,31 @@ startChatObserver();
 // -------------------------
 
 function sendMessageInActiveChat(text) {
-    let input = null;
+    const input =
+        document.querySelector('footer [contenteditable="true"]') ||
+        document.querySelector('[contenteditable="true"][data-tab="10"]');
 
-    if (lastInput && document.contains(lastInput)) {
-        input = lastInput;
-        console.log("[WA Scheduler] Usando lastInput");
-    } else {
-        input = findActiveComposer();
-
-        if (input) {
-            console.log("[WA Scheduler] Detectado nuevo input lexical");
-            setLastTargetsFromElement(input);
-        }
-    }
-
-    if (!input) {
-        console.warn("[WA Scheduler] No se encontró el campo de entrada");
-        throw new Error("No se encontró el cuadro de mensaje");
-    }
-
-    // Validar límite de caracteres
-    if (text.length > 4096) {
-        throw new Error(`Mensaje muy largo (${text.length}/4096 caracteres)`);
-    }
+    if (!input) throw new Error("No cuadro de texto");
+    if (text.length > 4096) throw new Error("Texto muy largo");
 
     input.focus();
-
-    const sel = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(input);
-    sel.removeAllRanges();
-    sel.addRange(range);
-
     document.execCommand("selectAll", false, null);
     document.execCommand("delete", false, null);
     document.execCommand("insertText", false, text);
 
-    console.log("[WA Scheduler] Texto insertado:", text.slice(0, 50) + "...");
-
-    const tryClickSend = () => {
-        let btn =
-            document.querySelector('button[aria-label="Send"]') ||
-            document.querySelector('button[aria-label="Enviar"]') ||
-            document.querySelector('button[aria-label="Enviar mensaje"]') ||
-            (document.querySelector('span[data-icon="send"]') &&
-                document.querySelector('span[data-icon="send"]').closest("button"));
-
-        if (btn && !btn.disabled) {
-            console.log("[WA Scheduler] Click en botón de enviar");
-            btn.click();
-            return true;
-        }
-
-        console.log("[WA Scheduler] Botón no disponible");
-        return false;
-    };
-
     setTimeout(() => {
-        if (!tryClickSend()) {
-            console.log("[WA Scheduler] Enviando ENTER de fallback");
-            const ev = new KeyboardEvent("keydown", {
-                key: "Enter",
-                code: "Enter",
-                keyCode: 13,
-                which: 13,
-                bubbles: true,
-                cancelable: true
-            });
-            input.dispatchEvent(ev);
+        const btn =
+            document.querySelector('[data-icon="send"]')?.closest("button") ||
+            document.querySelector('button[aria-label="Send"]');
+
+        if (btn) {
+            superClick(btn);
+        } else {
+            input.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Enter", keyCode: 13, bubbles: true })
+            );
         }
-    }, 120);
+    }, 400);
 }
 
 // -------------------------
@@ -401,78 +325,60 @@ function sendMessageInActiveChat(text) {
 // -------------------------
 
 async function sendToScheduledChat(id, text, chatTitle) {
-    console.log("[WA Scheduler] Envío programado a:", chatTitle);
+    console.log("--- Procesando:", chatTitle);
 
     if (!chatTitle) {
-        console.warn("[WA Scheduler] Sin chatTitle, enviando al chat activo");
         try {
             sendMessageInActiveChat(text);
             browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: true });
         } catch (e) {
-            browser.runtime.sendMessage({
-                type: "DELIVERY_REPORT",
-                id,
-                ok: false,
-                error: String(e)
-            });
+            browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: false, error: String(e) });
         }
         return;
     }
 
-    const opened = await openChatByTitle(chatTitle);
+    const current = getActiveChatTitle();
+    if (current && namesMatch(chatTitle, current)) {
+        console.log("Chat correcto ya abierto.");
+        try {
+            sendMessageInActiveChat(text);
+            browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: true });
+        } catch (e) {
+            browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: false, error: String(e) });
+        }
+        return;
+    }
+
+    let opened = openChatByTitle(chatTitle);
     if (!opened) {
-        console.error("[WA Scheduler] No se pudo localizar el chat:", chatTitle);
-        browser.runtime.sendMessage({
-            type: "DELIVERY_REPORT",
-            id,
-            ok: false,
-            error: `No se encontró el chat "${chatTitle}" en la lista.`
-        });
+        opened = await searchAndOpenChat(chatTitle);
+    }
+
+    if (!opened) {
+        browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: false, error: `Chat no encontrado: "${chatTitle}"` });
         return;
     }
 
-    let tries = 0;
-    const maxTries = 14;
+    let retries = 0;
+    const checkInterval = setInterval(() => {
+        retries++;
+        const activeNow = getActiveChatTitle();
 
-    while (tries < maxTries) {
-        const current = getActiveChatTitle();
-        console.log("[WA Scheduler] Esperando chat:", chatTitle, "/ activo:", current);
-
-        if (current && namesMatch(chatTitle, current)) {
-            console.log("[WA Scheduler] Chat correcto abierto, enviando mensaje");
-            const composer = findActiveComposer();
-            if (composer) {
-                setLastTargetsFromElement(composer);
-            }
-            try {
-                sendMessageInActiveChat(text);
-                browser.runtime.sendMessage({
-                    type: "DELIVERY_REPORT",
-                    id,
-                    ok: true
-                });
-            } catch (e) {
-                browser.runtime.sendMessage({
-                    type: "DELIVERY_REPORT",
-                    id,
-                    ok: false,
-                    error: String(e)
-                });
-            }
-            return;
+        if (activeNow && namesMatch(chatTitle, activeNow)) {
+            clearInterval(checkInterval);
+            setTimeout(() => {
+                try {
+                    sendMessageInActiveChat(text);
+                    browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: true });
+                } catch (e) {
+                    browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: false, error: String(e) });
+                }
+            }, 800);
+        } else if (retries >= 30) {
+            clearInterval(checkInterval);
+            browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: false, error: "Timeout cargando chat" });
         }
-
-        tries++;
-        await sleep(500);
-    }
-
-    console.error("[WA Scheduler] Timeout esperando el chat correcto");
-    browser.runtime.sendMessage({
-        type: "DELIVERY_REPORT",
-        id,
-        ok: false,
-        error: `No se pudo abrir el chat "${chatTitle}".`
-    });
+    }, 500);
 }
 
 // -------------------------

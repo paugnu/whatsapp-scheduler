@@ -1,0 +1,152 @@
+{
+  "extName": {
+    "message": "Planificateur WhatsApp"
+  },
+  "extDescription": {
+    "message": "Planifiez des messages dans WhatsApp Web."
+  },
+  "toastWriteMessage": {
+    "message": "Écrivez un message"
+  },
+  "toastTextTooLong": {
+    "message": "Message trop long ($1/4096)"
+  },
+  "toastNeedTime": {
+    "message": "Indiquez un délai supérieur à zéro"
+  },
+  "toastScheduledMinutes": {
+    "message": "✓ Message programmé dans $1 minute(s)"
+  },
+  "toastErrorWithDetail": {
+    "message": "Erreur : $1"
+  },
+  "toastMessageCancelled": {
+    "message": "Message annulé"
+  },
+  "errorNoResponse": {
+    "message": "aucune réponse"
+  },
+  "panelTitleSchedule": {
+    "message": "📅 Programmer un message"
+  },
+  "labelCurrentChat": {
+    "message": "Discussion actuelle"
+  },
+  "placeholderMessage": {
+    "message": "Écrivez votre message (max. 4096 caractères)..."
+  },
+  "labelHours": {
+    "message": "Heures"
+  },
+  "labelMinutes": {
+    "message": "Minutes"
+  },
+  "buttonSchedule": {
+    "message": "✓ Programmer"
+  },
+  "buttonList": {
+    "message": "📋 Liste"
+  },
+  "labelEditMessageTitle": {
+    "message": "✏️ Modifier le message"
+  },
+  "labelChat": {
+    "message": "Discussion"
+  },
+  "labelNoChat": {
+    "message": "(aucune discussion spécifiée)"
+  },
+  "labelMessage": {
+    "message": "Message"
+  },
+  "labelScheduledFor": {
+    "message": "⏰ Envoi prévu pour : <strong>$1</strong>"
+  },
+  "buttonSave": {
+    "message": "Enregistrer"
+  },
+  "buttonCancel": {
+    "message": "Annuler"
+  },
+  "statusScheduled": {
+    "message": "⏱️ Programmé"
+  },
+  "statusSending": {
+    "message": "📤 Envoi"
+  },
+  "statusSent": {
+    "message": "✅ Envoyé"
+  },
+  "statusFailed": {
+    "message": "❌ Erreur"
+  },
+  "listEmpty": {
+    "message": "Aucun message pour le moment"
+  },
+  "listError": {
+    "message": "Erreur lors du chargement de la liste"
+  },
+  "buttonEdit": {
+    "message": "✏️ Modifier"
+  },
+  "buttonDelete": {
+    "message": "🗑️ Annuler"
+  },
+  "confirmCancelSend": {
+    "message": "Annuler l'envoi de ce message programmé ?"
+  },
+  "errorTextTooLong": {
+    "message": "Texte trop long"
+  },
+  "errorNoComposer": {
+    "message": "Pas de zone de texte"
+  },
+  "errorChatNotFound": {
+    "message": "Discussion introuvable : \"$1\""
+  },
+  "errorChatAmbiguous": {
+    "message": "Plusieurs discussions correspondent à \"$1\". Ouvrez la bonne puis réessayez."
+  },
+  "errorChatTimeout": {
+    "message": "Délai dépassé lors du chargement de la discussion"
+  },
+  "buttonTooltip": {
+    "message": "Programmer un message (Ctrl+Shift+W)"
+  },
+  "errorCreateAlarm": {
+    "message": "Erreur lors de la création de l'alarme"
+  },
+  "errorMessageNotScheduled": {
+    "message": "Le message n'est pas programmé"
+  },
+  "errorMessageNotFound": {
+    "message": "Message introuvable"
+  },
+  "errorNoWhatsAppTab": {
+    "message": "Aucun onglet WhatsApp Web ouvert"
+  },
+  "errorFindTab": {
+    "message": "Erreur lors de la recherche de l'onglet WhatsApp : $1"
+  },
+  "errorContentScriptCommunication": {
+    "message": "Erreur de communication avec le content script : $1"
+  },
+  "toastLongLimit": {
+    "message": "Le message dépasse 4096 caractères"
+  },
+  "listTitle": {
+    "message": "Programmés"
+  },
+  "listLoading": {
+    "message": "Chargement..."
+  },
+  "labelChatUnknown": {
+    "message": "(non détecté)"
+  },
+  "toastMessageUpdated": {
+    "message": "✓ Message mis à jour"
+  },
+  "listSubtitle": {
+    "message": "Historique des envois"
+  }
+}

@@ -1,17 +1,90 @@
-// Compatibilidad Firefox/Chrome
+// Firefox/Chrome compatibility
 if (typeof browser === "undefined") {
     var browser = chrome;
 }
 
 console.log("[WA Scheduler] content-script cargado");
 
+const AVAILABLE_LOCALES = ["ca", "de", "en", "es", "fr", "hi", "id", "it", "nl", "pt_BR", "ru"];
+let localeMessages = {};
+let currentLocale = "en";
+let localeReady = loadLocaleMessages();
+
+function normalizeLocale(locale = "") {
+    const lc = locale.toLowerCase();
+    if (lc === "pt-br" || lc === "pt_br") return "pt_BR";
+    if (AVAILABLE_LOCALES.includes(lc)) return lc;
+
+    const base = lc.split(/[-_]/)[0];
+    if (AVAILABLE_LOCALES.includes(base)) return base;
+    return null;
+}
+
+async function loadLocaleMessages() {
+    const acceptLanguages =
+        (await browser?.i18n?.getAcceptLanguages?.().catch(() => [])) || [];
+    const navigatorLanguages = Array.isArray(navigator.languages)
+        ? navigator.languages
+        : navigator.language
+          ? [navigator.language]
+          : [];
+
+    const candidates = [...acceptLanguages, ...navigatorLanguages, currentLocale, "en"];
+
+    for (const candidate of candidates) {
+        const normalized = normalizeLocale(candidate);
+        if (!normalized) continue;
+
+        try {
+            const url = browser.runtime.getURL(`_locales/${normalized}/messages.json`);
+            const res = await fetch(url);
+            if (res.ok) {
+                localeMessages = await res.json();
+                currentLocale = normalized;
+                return;
+            }
+        } catch (e) {
+            console.warn("[WA Scheduler] Failed to load locale", candidate, e);
+        }
+    }
+
+    localeMessages = {};
+    currentLocale = "en";
+}
+
+function applySubstitutions(template, substitutions = []) {
+    return template.replace(/\$([0-9]+)/g, (_, index) => substitutions[index - 1] ?? "");
+}
+
+function t(key, substitutions = []) {
+    const template = localeMessages?.[key]?.message;
+    if (template) return applySubstitutions(template, substitutions);
+
+    try {
+        const native = browser?.i18n?.getMessage(key, substitutions);
+        if (native) return native;
+    } catch (e) {
+        // Fallback handled below
+    }
+
+    return key;
+}
+
+async function ensureLocaleReady() {
+    try {
+        await localeReady;
+    } catch (e) {
+        console.warn("[WA Scheduler] Locale preload failed", e);
+    }
+}
+
 // -------------------------
-// Utilidades base
+// Base utilities
 // -------------------------
 
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
-// CLICK NUCLEAR: Dispara eventos pointer + mouse para satisfacer a React
+// CLICK NUCLEAR: fire pointer + mouse events so React handlers receive them
 function superClick(element) {
     if (!element) return;
     const opts = { bubbles: true, cancelable: true, view: window, buttons: 1 };
@@ -23,7 +96,7 @@ function superClick(element) {
     });
 }
 
-// Escribe texto en inputs contenteditable simulando pegado
+// Write text into contenteditable inputs simulating a paste
 function triggerInputEvent(element, value) {
     if (!element) return;
     element.focus();
@@ -34,7 +107,7 @@ function triggerInputEvent(element, value) {
 }
 
 // -------------------------
-// Estado: último textarea y botón asociados
+// State: last textarea and send button cached
 // -------------------------
 
 let lastInput = null;
@@ -42,7 +115,7 @@ let lastSendButton = null;
 let lastChatTitle = null;
 let chatCheckTimeout = null;
 
-// Localizar el input del chat activo (sin usar caché)
+// Find the active chat composer without using cache
 function findActiveComposer() {
     return (
         document.querySelector('.lexical-rich-text-input [contenteditable="true"][data-lexical-editor="true"]') ||
@@ -72,7 +145,7 @@ function setLastTargetsFromElement(el) {
     console.log("[WA Scheduler] lastInput actualizado, lastSendButton:", !!lastSendButton);
 }
 
-// Detectar clicks/focus en el editor (con throttling)
+// Detect clicks/focus in the editor (with throttling)
 let focusTimeout = null;
 document.addEventListener(
     "focusin",
@@ -96,7 +169,7 @@ document.addEventListener(
 );
 
 // -------------------------
-// Detectar título del chat actual (solo panel derecho #main)
+// Detect the active chat title (right panel #main only)
 // -------------------------
 
 function getActiveChatTitle() {
@@ -116,7 +189,7 @@ function getActiveChatTitle() {
 }
 
 // -------------------------
-// Normalizar y comparar nombres
+// Normalize and compare chat names
 // -------------------------
 
 function normalizeName(s) {
@@ -127,18 +200,32 @@ function normalizeName(s) {
         .toLowerCase();
 }
 
-function namesMatch(target, candidate) {
+function nameMatchScore(target, candidate) {
     const t = normalizeName(target);
     const c = normalizeName(candidate);
 
-    if (!t || !c) return false;
-    if (t === c) return true;
-    if (c.includes(t)) return true;
-    return false;
+    if (!t || !c) return 0;
+    if (t === c) return 3;
+
+    if (c.startsWith(t)) {
+        const rest = c.slice(t.length);
+        if (rest === "" || /^([\s\(\[\{.,-]|–|—)/.test(rest)) return 2;
+    }
+
+    if (t.startsWith(c)) {
+        const rest = t.slice(c.length);
+        if (rest === "" || /^([\s\(\[\{.,-]|–|—)/.test(rest)) return 1;
+    }
+
+    return 0;
+}
+
+function namesMatch(target, candidate) {
+    return nameMatchScore(target, candidate) > 0;
 }
 
 // -------------------------
-// Abrir chat por título
+// Open chat by title
 // -------------------------
 
 function clearSearchBox(searchBox) {
@@ -149,30 +236,44 @@ function clearSearchBox(searchBox) {
 }
 
 function openChatByTitle(title) {
-    if (!title) return false;
+    if (!title) return { found: false };
 
     const sidePane = document.getElementById("pane-side") || document.body;
     const candidates = sidePane.querySelectorAll('span[dir="auto"]');
+    const matches = [];
 
     for (const span of candidates) {
         const text = span.textContent || span.getAttribute("title");
         if (!text) continue;
 
-        if (namesMatch(title, text)) {
+        const score = nameMatchScore(title, text);
+        if (score > 0) {
             const row = span.closest('div[role="row"]') || span.closest('div[role="button"]');
-
             if (row) {
-                console.log(`[WA Scheduler] Chat encontrado: "${text}". Abriendo...`);
-                row.scrollIntoView({ block: "center", behavior: "instant" });
-
-                superClick(span);
-                superClick(row);
-
-                return true;
+                matches.push({ span, row, text, score });
             }
         }
     }
-    return false;
+
+    if (!matches.length) return { found: false };
+
+    matches.sort((a, b) => b.score - a.score);
+    const bestScore = matches[0].score;
+    const bestMatches = matches.filter((m) => m.score === bestScore);
+
+    if (bestMatches.length > 1) {
+        showToast(t("errorChatAmbiguous", [title]), "warning", 6000);
+        return { found: false, reason: "ambiguous" };
+    }
+
+    const match = bestMatches[0];
+    console.log(`[WA Scheduler] Chat encontrado: "${match.text}". Abriendo...`);
+    match.row.scrollIntoView({ block: "center", behavior: "instant" });
+
+    superClick(match.span);
+    superClick(match.row);
+
+    return { found: true };
 }
 
 async function searchAndOpenChat(title) {
@@ -201,22 +302,24 @@ async function searchAndOpenChat(title) {
 
     await delay(1800);
 
-    const found = openChatByTitle(title);
+    const result = openChatByTitle(title);
 
-    if (found) {
+    if (result.found) {
         await delay(1500);
         const clearBtn =
             document.querySelector('[data-icon="x-alt"]')?.closest('div[role="button"]') ||
             document.querySelector('[data-icon="back"]')?.closest('div[role="button"]');
         if (clearBtn) superClick(clearBtn);
-        return true;
+        return { found: true };
     }
 
-    return false;
+    return result.reason === "ambiguous"
+        ? { found: false, reason: "ambiguous" }
+        : { found: false };
 }
 
 // -------------------------
-// Mostrar toast notifications
+// Toast notifications
 // -------------------------
 
 function showToast(msg, type = "info", duration = 3000) {
@@ -246,7 +349,7 @@ function showToast(msg, type = "info", duration = 3000) {
         word-wrap: break-word;
     `;
 
-    // 👉 aquí el texto:
+    // Insert the message text
     toast.textContent = msg;
 
     const style = document.createElement("style");
@@ -285,11 +388,11 @@ function showToast(msg, type = "info", duration = 3000) {
     }, duration);
 }
 
-// Iniciar sincronización del chat activo
+// Start synchronization for the active chat
 startChatObserver();
 
 // -------------------------
-// Escribir mensaje y enviarlo
+// Write and send a message
 // -------------------------
 
 function sendMessageInActiveChat(text) {
@@ -297,8 +400,8 @@ function sendMessageInActiveChat(text) {
         document.querySelector('footer [contenteditable="true"]') ||
         document.querySelector('[contenteditable="true"][data-tab="10"]');
 
-    if (!input) throw new Error("No cuadro de texto");
-    if (text.length > 4096) throw new Error("Texto muy largo");
+    if (!input) throw new Error(t("errorNoComposer"));
+    if (text.length > 4096) throw new Error(t("errorTextTooLong"));
 
     input.focus();
     document.execCommand("selectAll", false, null);
@@ -321,10 +424,12 @@ function sendMessageInActiveChat(text) {
 }
 
 // -------------------------
-// Envío al chat programado
+// Send to the scheduled chat
 // -------------------------
 
 async function sendToScheduledChat(id, text, chatTitle) {
+    await ensureLocaleReady();
+
     console.log("--- Procesando:", chatTitle);
 
     if (!chatTitle) {
@@ -349,13 +454,16 @@ async function sendToScheduledChat(id, text, chatTitle) {
         return;
     }
 
-    let opened = openChatByTitle(chatTitle);
-    if (!opened) {
-        opened = await searchAndOpenChat(chatTitle);
+    let openResult = openChatByTitle(chatTitle);
+    if (!openResult.found) {
+        openResult = await searchAndOpenChat(chatTitle);
     }
 
-    if (!opened) {
-        browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: false, error: `Chat no encontrado: "${chatTitle}"` });
+    if (!openResult.found) {
+        const err = openResult.reason === "ambiguous"
+            ? t("errorChatAmbiguous", [chatTitle])
+            : t("errorChatNotFound", [chatTitle]);
+        browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: false, error: err });
         return;
     }
 
@@ -376,13 +484,13 @@ async function sendToScheduledChat(id, text, chatTitle) {
             }, 800);
         } else if (retries >= 30) {
             clearInterval(checkInterval);
-            browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: false, error: "Timeout cargando chat" });
+            browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: false, error: t("errorChatTimeout") });
         }
     }, 500);
 }
 
 // -------------------------
-// Mantener sincronizado el input con el chat activo
+// Keep composer/input synchronized with the active chat
 // -------------------------
 
 function startChatObserver() {
@@ -400,23 +508,25 @@ function startChatObserver() {
         }
     };
 
-    // Observador ligero del header
+    // Lightweight observer on the header
     const header = document.querySelector("header");
     if (header) {
         const mo = new MutationObserver(() => updateTargetsForChat());
         mo.observe(header, { childList: true, subtree: true, characterData: true });
     }
 
-    // Fallback periódico por si el observer no detecta cambios
+    // Periodic fallback in case the observer misses changes
     setInterval(updateTargetsForChat, 1500);
 }
 
 // -------------------------
-// Modal para editar mensajes
+// Edit modal
 // -------------------------
 
-function openEditDialog(msgId, msg) {
-    // Remover modal anterior si existe
+async function openEditDialog(msgId, msg) {
+    await ensureLocaleReady();
+
+    // Remove existing modal if present
     const existing = document.getElementById("wa-edit-modal");
     if (existing) existing.remove();
 
@@ -483,34 +593,34 @@ function openEditDialog(msgId, msg) {
             }
         </style>
 
-        <div style="font-weight: 700; font-size: 16px; margin-bottom: 16px;">✏️ Editar mensaje</div>
+        <div style="font-weight: 700; font-size: 16px; margin-bottom: 16px;">${t("labelEditMessageTitle")}</div>
 
         <div style="margin-bottom: 12px;">
-            <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600;">Chat</label>
+            <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600;">${t("labelChat")}</label>
             <div style="background: rgba(37, 211, 102, 0.15); padding: 8px; border-radius: 6px; border-left: 3px solid #25D366; font-size: 12px;">
-                ${msg.chatTitle || "(sin chat especificado)"}
+                ${msg.chatTitle || t("labelNoChat")}
             </div>
         </div>
 
         <div style="margin-bottom: 12px;">
-            <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600;">Mensaje</label>
+            <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600;">${t("labelMessage")}</label>
             <textarea id="wa-edit-text" style="height: 100px; resize: vertical; margin-bottom: 6px;">${msg.text}</textarea>
             <div style="font-size: 10px; opacity: 0.7;"><span id="wa-edit-char-count">${msg.text.length}</span> / 4096</div>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
             <div>
-                <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600;">Horas</label>
+                <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600;">${t("labelHours")}</label>
                 <input id="wa-edit-hours" type="number" min="0" max="999" value="${hours}">
             </div>
             <div>
-                <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600;">Minutos</label>
+                <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600;">${t("labelMinutes")}</label>
                 <input id="wa-edit-mins" type="number" min="0" max="59" value="${mins}">
             </div>
         </div>
 
         <div style="background: rgba(59, 130, 246, 0.15); padding: 8px; border-radius: 6px; margin-bottom: 16px; font-size: 11px; opacity: 0.9;">
-            ⏰ Envío programado para: <strong>${sendAtDate.toLocaleString()}</strong>
+            ${t("labelScheduledFor", [sendAtDate.toLocaleString()])}
         </div>
 
         <div style="display: flex; gap: 8px;">
@@ -518,14 +628,14 @@ function openEditDialog(msgId, msg) {
                 style="flex: 1; background: #25D366; color: black; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px; transition: all 0.2s;"
                 onmouseover="this.style.transform='scale(1.02)'; this.style.boxShadow='0 4px 12px rgba(37,211,102,0.3)'"
                 onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none'">
-                💾 Guardar cambios
+                💾 ${t("buttonSave")}
             </button>
 
             <button id="wa-edit-cancel"
                 style="flex: 1; background: rgba(255, 255, 255, 0.15); color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px; transition: all 0.2s;"
                 onmouseover="this.style.background='rgba(255, 255, 255, 0.25)'"
                 onmouseout="this.style.background='rgba(255, 255, 255, 0.15)'">
-                ✕ Cancelar
+                ✕ ${t("buttonCancel")}
             </button>
         </div>
     `;
@@ -533,7 +643,7 @@ function openEditDialog(msgId, msg) {
     modal.appendChild(content);
     document.body.appendChild(modal);
 
-    // Contador de caracteres
+    // Character counter
     const textInput = document.getElementById("wa-edit-text");
     const charCount = document.getElementById("wa-edit-char-count");
 
@@ -548,16 +658,16 @@ function openEditDialog(msgId, msg) {
         }
     });
 
-    // Focus al texto
+    // Focus on the textarea
     setTimeout(() => textInput.focus(), 100);
 
-    // Botón cancelar
+    // Cancel button
     document.getElementById("wa-edit-cancel").addEventListener("click", () => {
         modal.style.animation = "slideOut 0.3s ease-in";
         setTimeout(() => modal.remove(), 300);
     });
 
-    // Cerrar con ESC
+    // Close with ESC
     const escapeHandler = (e) => {
         if (e.key === "Escape") {
             modal.style.animation = "slideOut 0.3s ease-in";
@@ -569,25 +679,25 @@ function openEditDialog(msgId, msg) {
     };
     document.addEventListener("keydown", escapeHandler);
 
-    // Botón guardar
+    // Save button
     document.getElementById("wa-edit-save").addEventListener("click", () => {
         const newText = textInput.value.trim();
         const newHours = parseInt(document.getElementById("wa-edit-hours").value || "0", 10);
         const newMins = parseInt(document.getElementById("wa-edit-mins").value || "0", 10);
 
         if (!newText) {
-            showToast("El mensaje no puede estar vacío", "warning");
+            showToast(t("toastWriteMessage"), "warning");
             return;
         }
 
         if (newText.length > 4096) {
-            showToast(`Mensaje muy largo (${newText.length}/4096)`, "error");
+            showToast(t("toastTextTooLong", [newText.length]), "error");
             return;
         }
 
         const newTotalMins = newHours * 60 + newMins;
         if (newTotalMins <= 0) {
-            showToast("Indica un tiempo > 0", "warning");
+            showToast(t("toastNeedTime"), "warning");
             return;
         }
 
@@ -602,7 +712,7 @@ function openEditDialog(msgId, msg) {
             },
             (resp) => {
                 if (resp && resp.ok) {
-                    showToast("✓ Mensaje actualizado", "success");
+                    showToast(t("toastMessageUpdated"), "success");
                     modal.style.animation = "slideOut 0.3s ease-in";
                     setTimeout(() => {
                         modal.remove();
@@ -610,13 +720,13 @@ function openEditDialog(msgId, msg) {
                         renderListPanel();
                     }, 300);
                 } else {
-                    showToast(`Error: ${resp?.error || "desconocido"}`, "error", 5000);
+                    showToast(t("toastErrorWithDetail", [resp?.error || t("errorNoResponse")]), "error", 5000);
                 }
             }
         );
     });
 
-    // Cerrar clickeando fuera del modal
+    // Close when clicking outside the modal
     modal.addEventListener("click", (e) => {
         if (e.target === modal) {
             modal.style.animation = "slideOut 0.3s ease-in";
@@ -629,9 +739,11 @@ function openEditDialog(msgId, msg) {
 }
 
 // -------------------------
-// Panel de lista (mejorado)
+// Enhanced list panel
 
-function renderListPanel() {
+async function renderListPanel() {
+    await ensureLocaleReady();
+
     const existing = document.getElementById("wa-scheduler-list");
     if (existing) existing.remove();
 
@@ -659,15 +771,15 @@ function renderListPanel() {
     panel.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.15);">
             <div>
-                <div style="font-weight: 700; font-size: 13px; margin-bottom: 2px;">Mensajes programados</div>
-                <div style="font-size: 10px; opacity: 0.7;">Historial de envíos</div>
+                <div style="font-weight: 700; font-size: 13px; margin-bottom: 2px;">${t("listTitle")}</div>
+                <div style="font-size: 10px; opacity: 0.7;">${t("listSubtitle")}</div>
             </div>
             <button id="wa-list-close"
                 style="background: rgba(255,255,255,0.15);color: white;border: none;border-radius: 6px;padding: 6px 10px;cursor: pointer;font-size: 16px;transition: all 0.2s;"
                 onmouseover="this.style.background='rgba(255,255,255,0.25)'"
                 onmouseout="this.style.background='rgba(255,255,255,0.15)'">✕</button>
         </div>
-        <div id="wa-scheduler-list-body" style="max-height: 55vh; overflow-y: auto;">Cargando...</div>
+        <div id="wa-scheduler-list-body" style="max-height: 55vh; overflow-y: auto;">${t("listLoading")}</div>
     `;
 
     document.body.appendChild(panel);
@@ -679,13 +791,13 @@ function renderListPanel() {
 
     browser.runtime.sendMessage({ type: "GET_MESSAGES" }, (resp) => {
         if (!resp || !resp.ok) {
-            body.innerHTML = '<div style="color: #ff6b6b; text-align: center; padding: 20px;">Error obteniendo la lista</div>';
+            body.innerHTML = `<div style="color: #ff6b6b; text-align: center; padding: 20px;">${t("listError")}</div>`;
             return;
         }
 
         const msgs = resp.messages || [];
         if (!msgs.length) {
-            body.innerHTML = '<div style="color: rgba(255,255,255,0.5); text-align: center; padding: 20px;">No hay mensajes todavía</div>';
+            body.innerHTML = `<div style="color: rgba(255,255,255,0.5); text-align: center; padding: 20px;">${t("listEmpty")}</div>`;
             return;
         }
 
@@ -722,10 +834,10 @@ function renderListPanel() {
                 : (m.text || "");
 
             const statusLabel = {
-                scheduled: "⏱️ Programado",
-                sending: "📤 Enviando",
-                sent: "✅ Enviado",
-                failed: "❌ Error"
+                scheduled: t("statusScheduled"),
+                sending: t("statusSending"),
+                sent: t("statusSent"),
+                failed: t("statusFailed")
             }[m.status] || m.status;
 
             const canEdit = m.status === "scheduled";
@@ -740,17 +852,17 @@ function renderListPanel() {
                     <div style="display: flex; gap: 4px;">
                         ${canEdit ? `<button class="wa-list-edit" data-id="${m.id}"
                             style="background: rgba(59, 130, 246, 0.7); color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; transition: all 0.2s;"
-                            title="Editar mensaje">
-                            ✏️ Editar
+                            title="${t("buttonEdit")}">
+                            ${t("buttonEdit")}
                         </button>` : ""}
                         ${canCancel ? `<button class="wa-list-cancel" data-id="${m.id}"
                             style="background: rgba(220, 38, 38, 0.7); color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; transition: all 0.2s;"
-                            title="Cancelar envío">
-                            🗑️ Cancelar
+                            title="${t("buttonDelete")}">
+                            ${t("buttonDelete")}
                         </button>` : ""}
                     </div>
                 </div>
-                <div style="font-weight: 600; margin-bottom: 4px; opacity: 0.95; word-break: break-word;">${m.chatTitle || "(sin chat)"}</div>
+                <div style="font-weight: 600; margin-bottom: 4px; opacity: 0.95; word-break: break-word;">${m.chatTitle || t("labelNoChat")}</div>
                 <div style="opacity: 0.85; margin-bottom: 6px; word-break: break-word; line-height: 1.3; font-size: 11px; background: rgba(255,255,255,0.05); padding: 6px; border-radius: 4px;">${textShort}</div>
                 ${delivered ? `<div style="font-size: 10px; opacity: 0.7; color: #25D366;">✓ ${delivered}</div>` : ""}
                 ${m.lastError ? `<div style="font-size: 10px; color: #ff9999; margin-top: 4px;">⚠ ${m.lastError}</div>` : ""}
@@ -759,7 +871,7 @@ function renderListPanel() {
             body.appendChild(row);
         });
 
-        // Event listeners para botones de editar y cancelar
+        // Event listeners for edit and cancel buttons
         document.querySelectorAll(".wa-list-edit").forEach((btn) => {
             btn.addEventListener("mouseover", () => {
                 btn.style.background = "rgba(59, 130, 246, 1)";
@@ -790,15 +902,15 @@ function renderListPanel() {
             btn.addEventListener("click", (e) => {
                 e.stopPropagation();
                 const msgId = btn.getAttribute("data-id");
-                if (confirm("¿Cancelar el envío de este mensaje?")) {
+                if (confirm(t("confirmCancelSend"))) {
                     browser.runtime.sendMessage(
                         { type: "CANCEL_MESSAGE", id: msgId },
                         (resp) => {
                             if (resp && resp.ok) {
-                                showToast("Mensaje cancelado", "success");
+                                showToast(t("toastMessageCancelled"), "success");
                                 renderListPanel();
                             } else {
-                                showToast(`Error: ${resp?.error || "desconocido"}`, "error");
+                                showToast(t("toastErrorWithDetail", [resp?.error || t("errorNoResponse")]), "error");
                             }
                         }
                     );
@@ -809,10 +921,12 @@ function renderListPanel() {
 }
 
 // -------------------------
-// Panel de programación (mejorado)
+// Enhanced scheduling panel
 // -------------------------
 
-function createSchedulerUI() {
+async function createSchedulerUI() {
+    await ensureLocaleReady();
+
     if (document.getElementById("wa-scheduler-panel")) return;
 
     const panel = document.createElement("div");
@@ -835,7 +949,7 @@ function createSchedulerUI() {
         animation: slideUp 0.3s ease-out;
     `;
 
-    const chatTitle = getActiveChatTitle() || "(no detectado)";
+    const chatTitle = getActiveChatTitle() || t("labelChatUnknown");
 
     panel.innerHTML = `
         <style>
@@ -873,21 +987,21 @@ function createSchedulerUI() {
             }
         </style>
 
-        <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px;">📅 Programar mensaje</div>
-        
+        <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px;">${t("panelTitleSchedule")}</div>
+
         <div style="background: rgba(37, 211, 102, 0.15); border-left: 3px solid #25D366; padding: 8px; border-radius: 4px; margin-bottom: 12px; font-size: 11px;">
-            <div style="font-weight: 600; color: #25D366;">Chat actual</div>
+            <div style="font-weight: 600; color: #25D366;">${t("labelCurrentChat")}</div>
             <div style="opacity: 0.9;">${chatTitle}</div>
         </div>
 
         <textarea id="wa-msg"
-            placeholder="Escribe tu mensaje (máx. 4096 caracteres)..."
+            placeholder="${t("placeholderMessage")}"
             style="width: 100%; height: 70px; margin-bottom: 10px; resize: vertical;"></textarea>
 
         <div style="display: flex; gap: 8px; margin-bottom: 12px;">
     <div style="flex: 1;">
         <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px;">
-            Horas
+            ${t("labelHours")}
         </label>
         <input id="wa-hours"
                type="number"
@@ -910,7 +1024,7 @@ function createSchedulerUI() {
 
     <div style="flex: 1;">
         <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px;">
-            Minutos
+            ${t("labelMinutes")}
         </label>
         <input id="wa-mins"
                type="number"
@@ -941,14 +1055,14 @@ function createSchedulerUI() {
                 style="flex: 1; background: #25D366; color: black; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px; transition: all 0.2s;"
                 onmouseover="this.style.transform='scale(1.02)'; this.style.boxShadow='0 4px 12px rgba(37,211,102,0.3)'"
                 onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none'">
-                ✓ Programar
+                ${t("buttonSchedule")}
             </button>
 
             <button id="wa-list"
                 style="flex: 1; background: rgba(59, 130, 246, 0.8); color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px; transition: all 0.2s;"
                 onmouseover="this.style.background='rgba(59, 130, 246, 1)'; this.style.transform='scale(1.02)'"
                 onmouseout="this.style.background='rgba(59, 130, 246, 0.8)'; this.style.transform='scale(1)'">
-                📋 Ver lista
+                ${t("buttonList")}
             </button>
 
             <button id="wa-close"
@@ -962,7 +1076,7 @@ function createSchedulerUI() {
 
     document.body.appendChild(panel);
 
-    // Actualizar contador de caracteres
+    // Character counter
     const msgInput = document.getElementById("wa-msg");
     const charCount = document.getElementById("wa-char-count");
     msgInput.addEventListener("input", () => {
@@ -985,18 +1099,18 @@ function createSchedulerUI() {
         const mins = parseInt(document.getElementById("wa-mins").value || "0", 10);
 
         if (!text) {
-            showToast("Escribe un mensaje", "warning");
+            showToast(t("toastWriteMessage"), "warning");
             return;
         }
 
         if (text.length > 4096) {
-            showToast(`Mensaje muy largo (${text.length}/4096)`, "error");
+            showToast(t("toastTextTooLong", [text.length]), "error");
             return;
         }
 
         const totalMins = hours * 60 + mins;
         if (totalMins <= 0) {
-            showToast("Indica un tiempo > 0", "warning");
+            showToast(t("toastNeedTime"), "warning");
             return;
         }
 
@@ -1012,34 +1126,36 @@ function createSchedulerUI() {
             },
             (resp) => {
                 if (resp && resp.ok) {
-                    showToast(`✓ Mensaje programado en ${totalMins} minuto(s)`, "success");
+                    showToast(t("toastScheduledMinutes", [totalMins]), "success");
                     msgInput.value = "";
                     document.getElementById("wa-hours").value = "0";
                     document.getElementById("wa-mins").value = "0";
                     charCount.textContent = "0";
                     setTimeout(() => panel.remove(), 500);
                 } else {
-                    showToast(`Error: ${resp?.error || "sin respuesta"}`, "error", 5000);
+                    showToast(t("toastErrorWithDetail", [resp?.error || t("errorNoResponse")]), "error", 5000);
                 }
             }
         );
     };
 
-    // Focus al campo de texto
+    // Focus on the text field
     setTimeout(() => msgInput.focus(), 100);
 }
 
 // -------------------------
-// Botón flotante
+// Floating button
 // -------------------------
 
-function createFloatingButton() {
+async function createFloatingButton() {
+    await ensureLocaleReady();
+
     if (document.getElementById("wa-scheduler-button")) return;
 
     const btn = document.createElement("button");
     btn.id = "wa-scheduler-button";
     btn.textContent = "📅";
-    btn.title = "Programar mensaje (Ctrl+Shift+W)";
+    btn.title = t("buttonTooltip");
     btn.style.cssText = `
         position: fixed;
         bottom: 20px;
@@ -1080,7 +1196,7 @@ function createFloatingButton() {
 setTimeout(createFloatingButton, 3000);
 
 // -------------------------
-// Atajos de teclado
+// Keyboard shortcuts
 // -------------------------
 
 document.addEventListener("keydown", (e) => {
@@ -1091,7 +1207,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 // -------------------------
-// Mensajes desde background
+// Messages from background
 // -------------------------
 
 browser.runtime.onMessage.addListener((msg) => {

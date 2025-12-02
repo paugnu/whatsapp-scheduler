@@ -1,0 +1,152 @@
+{
+  "extName": {
+    "message": "Планировщик WhatsApp"
+  },
+  "extDescription": {
+    "message": "Планируйте сообщения в WhatsApp Web."
+  },
+  "toastWriteMessage": {
+    "message": "Напишите сообщение"
+  },
+  "toastTextTooLong": {
+    "message": "Сообщение слишком длинное ($1/4096)"
+  },
+  "toastNeedTime": {
+    "message": "Укажите время больше нуля"
+  },
+  "toastScheduledMinutes": {
+    "message": "✓ Сообщение запланировано через $1 мин."
+  },
+  "toastErrorWithDetail": {
+    "message": "Ошибка: $1"
+  },
+  "toastMessageCancelled": {
+    "message": "Сообщение отменено"
+  },
+  "errorNoResponse": {
+    "message": "нет ответа"
+  },
+  "panelTitleSchedule": {
+    "message": "📅 Запланировать сообщение"
+  },
+  "labelCurrentChat": {
+    "message": "Текущий чат"
+  },
+  "placeholderMessage": {
+    "message": "Введите сообщение (макс. 4096 символов)..."
+  },
+  "labelHours": {
+    "message": "Часы"
+  },
+  "labelMinutes": {
+    "message": "Минуты"
+  },
+  "buttonSchedule": {
+    "message": "✓ Запланировать"
+  },
+  "buttonList": {
+    "message": "📋 Список"
+  },
+  "labelEditMessageTitle": {
+    "message": "✏️ Редактировать сообщение"
+  },
+  "labelChat": {
+    "message": "Чат"
+  },
+  "labelNoChat": {
+    "message": "(чат не указан)"
+  },
+  "labelMessage": {
+    "message": "Сообщение"
+  },
+  "labelScheduledFor": {
+    "message": "⏰ Запланировано на: <strong>$1</strong>"
+  },
+  "buttonSave": {
+    "message": "Сохранить"
+  },
+  "buttonCancel": {
+    "message": "Отмена"
+  },
+  "statusScheduled": {
+    "message": "⏱️ Запланировано"
+  },
+  "statusSending": {
+    "message": "📤 Отправка"
+  },
+  "statusSent": {
+    "message": "✅ Отправлено"
+  },
+  "statusFailed": {
+    "message": "❌ Ошибка"
+  },
+  "listEmpty": {
+    "message": "Сообщений пока нет"
+  },
+  "listError": {
+    "message": "Ошибка загрузки списка"
+  },
+  "buttonEdit": {
+    "message": "✏️ Редактировать"
+  },
+  "buttonDelete": {
+    "message": "🗑️ Отменить"
+  },
+  "confirmCancelSend": {
+    "message": "Отменить это запланированное сообщение?"
+  },
+  "errorTextTooLong": {
+    "message": "Текст слишком длинный"
+  },
+  "errorNoComposer": {
+    "message": "Нет поля для ввода"
+  },
+  "errorChatNotFound": {
+    "message": "Чат не найден: \"$1\""
+  },
+  "errorChatAmbiguous": {
+    "message": "Несколько чатов соответствуют \"$1\". Откройте нужный и повторите попытку."
+  },
+  "errorChatTimeout": {
+    "message": "Время ожидания загрузки чата истекло"
+  },
+  "buttonTooltip": {
+    "message": "Запланировать сообщение (Ctrl+Shift+W)"
+  },
+  "errorCreateAlarm": {
+    "message": "Ошибка при создании напоминания"
+  },
+  "errorMessageNotScheduled": {
+    "message": "Сообщение не запланировано"
+  },
+  "errorMessageNotFound": {
+    "message": "Сообщение не найдено"
+  },
+  "errorNoWhatsAppTab": {
+    "message": "Нет открытой вкладки WhatsApp Web"
+  },
+  "errorFindTab": {
+    "message": "Ошибка поиска вкладки WhatsApp: $1"
+  },
+  "errorContentScriptCommunication": {
+    "message": "Ошибка связи с content script: $1"
+  },
+  "toastLongLimit": {
+    "message": "Сообщение превышает 4096 символов"
+  },
+  "listTitle": {
+    "message": "Запланировано"
+  },
+  "listLoading": {
+    "message": "Загрузка..."
+  },
+  "labelChatUnknown": {
+    "message": "(не обнаружено)"
+  },
+  "toastMessageUpdated": {
+    "message": "✓ Сообщение обновлено"
+  },
+  "listSubtitle": {
+    "message": "История отправок"
+  }
+}

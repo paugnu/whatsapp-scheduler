@@ -1,0 +1,152 @@
+{
+  "extName": {
+    "message": "WhatsApp Planner"
+  },
+  "extDescription": {
+    "message": "Plan berichten in WhatsApp Web."
+  },
+  "toastWriteMessage": {
+    "message": "Schrijf een bericht"
+  },
+  "toastTextTooLong": {
+    "message": "Bericht te lang ($1/4096)"
+  },
+  "toastNeedTime": {
+    "message": "Geef een tijd groter dan nul op"
+  },
+  "toastScheduledMinutes": {
+    "message": "✓ Bericht gepland over $1 minuut/minuten"
+  },
+  "toastErrorWithDetail": {
+    "message": "Fout: $1"
+  },
+  "toastMessageCancelled": {
+    "message": "Bericht geannuleerd"
+  },
+  "errorNoResponse": {
+    "message": "geen antwoord"
+  },
+  "panelTitleSchedule": {
+    "message": "📅 Bericht plannen"
+  },
+  "labelCurrentChat": {
+    "message": "Huidige chat"
+  },
+  "placeholderMessage": {
+    "message": "Schrijf je bericht (max. 4096 tekens)..."
+  },
+  "labelHours": {
+    "message": "Uren"
+  },
+  "labelMinutes": {
+    "message": "Minuten"
+  },
+  "buttonSchedule": {
+    "message": "✓ Plannen"
+  },
+  "buttonList": {
+    "message": "📋 Lijst"
+  },
+  "labelEditMessageTitle": {
+    "message": "✏️ Bericht bewerken"
+  },
+  "labelChat": {
+    "message": "Chat"
+  },
+  "labelNoChat": {
+    "message": "(geen chat opgegeven)"
+  },
+  "labelMessage": {
+    "message": "Bericht"
+  },
+  "labelScheduledFor": {
+    "message": "⏰ Gepland voor: <strong>$1</strong>"
+  },
+  "buttonSave": {
+    "message": "Opslaan"
+  },
+  "buttonCancel": {
+    "message": "Annuleren"
+  },
+  "statusScheduled": {
+    "message": "⏱️ Gepland"
+  },
+  "statusSending": {
+    "message": "📤 Verzenden"
+  },
+  "statusSent": {
+    "message": "✅ Verzonden"
+  },
+  "statusFailed": {
+    "message": "❌ Fout"
+  },
+  "listEmpty": {
+    "message": "Nog geen berichten"
+  },
+  "listError": {
+    "message": "Fout bij laden van lijst"
+  },
+  "buttonEdit": {
+    "message": "✏️ Bewerken"
+  },
+  "buttonDelete": {
+    "message": "🗑️ Annuleren"
+  },
+  "confirmCancelSend": {
+    "message": "Dit geplande bericht annuleren?"
+  },
+  "errorTextTooLong": {
+    "message": "Tekst te lang"
+  },
+  "errorNoComposer": {
+    "message": "Geen tekstvak"
+  },
+  "errorChatNotFound": {
+    "message": "Chat niet gevonden: \"$1\""
+  },
+  "errorChatAmbiguous": {
+    "message": "Meerdere chats komen overeen met \"$1\". Open de juiste en probeer opnieuw."
+  },
+  "errorChatTimeout": {
+    "message": "Time-out bij laden van chat"
+  },
+  "buttonTooltip": {
+    "message": "Bericht plannen (Ctrl+Shift+W)"
+  },
+  "errorCreateAlarm": {
+    "message": "Fout bij het maken van alarm"
+  },
+  "errorMessageNotScheduled": {
+    "message": "Het bericht is niet gepland"
+  },
+  "errorMessageNotFound": {
+    "message": "Bericht niet gevonden"
+  },
+  "errorNoWhatsAppTab": {
+    "message": "Geen WhatsApp Web-tabblad open"
+  },
+  "errorFindTab": {
+    "message": "Fout bij zoeken naar WhatsApp-tabblad: $1"
+  },
+  "errorContentScriptCommunication": {
+    "message": "Communicatiefout met content script: $1"
+  },
+  "toastLongLimit": {
+    "message": "Bericht is langer dan 4096 tekens"
+  },
+  "listTitle": {
+    "message": "Gepland"
+  },
+  "listLoading": {
+    "message": "Laden..."
+  },
+  "labelChatUnknown": {
+    "message": "(niet gedetecteerd)"
+  },
+  "toastMessageUpdated": {
+    "message": "✓ Bericht bijgewerkt"
+  },
+  "listSubtitle": {
+    "message": "Verzendgeschiedenis"
+  }
+}

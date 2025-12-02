@@ -1,0 +1,152 @@
+{
+  "extName": {
+    "message": "Penjadwal WhatsApp"
+  },
+  "extDescription": {
+    "message": "Jadwalkan pesan di WhatsApp Web."
+  },
+  "toastWriteMessage": {
+    "message": "Tulis pesan"
+  },
+  "toastTextTooLong": {
+    "message": "Pesan terlalu panjang ($1/4096)"
+  },
+  "toastNeedTime": {
+    "message": "Atur waktu lebih dari nol"
+  },
+  "toastScheduledMinutes": {
+    "message": "✓ Pesan dijadwalkan dalam $1 menit"
+  },
+  "toastErrorWithDetail": {
+    "message": "Kesalahan: $1"
+  },
+  "toastMessageCancelled": {
+    "message": "Pesan dibatalkan"
+  },
+  "errorNoResponse": {
+    "message": "tidak ada respons"
+  },
+  "panelTitleSchedule": {
+    "message": "📅 Jadwalkan pesan"
+  },
+  "labelCurrentChat": {
+    "message": "Obrolan aktif"
+  },
+  "placeholderMessage": {
+    "message": "Tulis pesan Anda (maks. 4096 karakter)..."
+  },
+  "labelHours": {
+    "message": "Jam"
+  },
+  "labelMinutes": {
+    "message": "Menit"
+  },
+  "buttonSchedule": {
+    "message": "✓ Jadwalkan"
+  },
+  "buttonList": {
+    "message": "📋 Daftar"
+  },
+  "labelEditMessageTitle": {
+    "message": "✏️ Edit pesan"
+  },
+  "labelChat": {
+    "message": "Obrolan"
+  },
+  "labelNoChat": {
+    "message": "(tidak ada obrolan ditentukan)"
+  },
+  "labelMessage": {
+    "message": "Pesan"
+  },
+  "labelScheduledFor": {
+    "message": "⏰ Dijadwalkan untuk: <strong>$1</strong>"
+  },
+  "buttonSave": {
+    "message": "Simpan"
+  },
+  "buttonCancel": {
+    "message": "Batal"
+  },
+  "statusScheduled": {
+    "message": "⏱️ Dijadwalkan"
+  },
+  "statusSending": {
+    "message": "📤 Mengirim"
+  },
+  "statusSent": {
+    "message": "✅ Terkirim"
+  },
+  "statusFailed": {
+    "message": "❌ Gagal"
+  },
+  "listEmpty": {
+    "message": "Belum ada pesan"
+  },
+  "listError": {
+    "message": "Gagal memuat daftar"
+  },
+  "buttonEdit": {
+    "message": "✏️ Edit"
+  },
+  "buttonDelete": {
+    "message": "🗑️ Batalkan"
+  },
+  "confirmCancelSend": {
+    "message": "Batalkan pesan terjadwal ini?"
+  },
+  "errorTextTooLong": {
+    "message": "Teks terlalu panjang"
+  },
+  "errorNoComposer": {
+    "message": "Kotak teks tidak ada"
+  },
+  "errorChatNotFound": {
+    "message": "Obrolan tidak ditemukan: \"$1\""
+  },
+  "errorChatAmbiguous": {
+    "message": "Beberapa obrolan cocok dengan \"$1\". Buka obrolan yang benar lalu coba lagi."
+  },
+  "errorChatTimeout": {
+    "message": "Waktu habis saat memuat obrolan"
+  },
+  "buttonTooltip": {
+    "message": "Jadwalkan pesan (Ctrl+Shift+W)"
+  },
+  "errorCreateAlarm": {
+    "message": "Gagal membuat alarm"
+  },
+  "errorMessageNotScheduled": {
+    "message": "Pesan tidak dijadwalkan"
+  },
+  "errorMessageNotFound": {
+    "message": "Pesan tidak ditemukan"
+  },
+  "errorNoWhatsAppTab": {
+    "message": "Tidak ada tab WhatsApp Web terbuka"
+  },
+  "errorFindTab": {
+    "message": "Kesalahan mencari tab WhatsApp: $1"
+  },
+  "errorContentScriptCommunication": {
+    "message": "Kesalahan komunikasi dengan content script: $1"
+  },
+  "toastLongLimit": {
+    "message": "Pesan melebihi 4096 karakter"
+  },
+  "listTitle": {
+    "message": "Terjadwal"
+  },
+  "listLoading": {
+    "message": "Memuat..."
+  },
+  "labelChatUnknown": {
+    "message": "(tidak terdeteksi)"
+  },
+  "toastMessageUpdated": {
+    "message": "✓ Pesan diperbarui"
+  },
+  "listSubtitle": {
+    "message": "Riwayat pengiriman"
+  }
+}

@@ -1,0 +1,152 @@
+{
+  "extName": {
+    "message": "Planificador de WhatsApp"
+  },
+  "extDescription": {
+    "message": "Programa missatges a WhatsApp Web."
+  },
+  "toastWriteMessage": {
+    "message": "Escriu un missatge"
+  },
+  "toastTextTooLong": {
+    "message": "Missatge massa llarg ($1/4096)"
+  },
+  "toastNeedTime": {
+    "message": "Indica un temps superior a zero"
+  },
+  "toastScheduledMinutes": {
+    "message": "✓ Missatge programat en $1 minut(s)"
+  },
+  "toastErrorWithDetail": {
+    "message": "Error: $1"
+  },
+  "toastMessageCancelled": {
+    "message": "Missatge cancel·lat"
+  },
+  "errorNoResponse": {
+    "message": "sense resposta"
+  },
+  "panelTitleSchedule": {
+    "message": "📅 Programar missatge"
+  },
+  "labelCurrentChat": {
+    "message": "Xat actual"
+  },
+  "placeholderMessage": {
+    "message": "Escriu el teu missatge (màx. 4096 caràcters)..."
+  },
+  "labelHours": {
+    "message": "Hores"
+  },
+  "labelMinutes": {
+    "message": "Minuts"
+  },
+  "buttonSchedule": {
+    "message": "✓ Programar"
+  },
+  "buttonList": {
+    "message": "📋 Llista"
+  },
+  "labelEditMessageTitle": {
+    "message": "✏️ Editar missatge"
+  },
+  "labelChat": {
+    "message": "Xat"
+  },
+  "labelNoChat": {
+    "message": "(sense xat especificat)"
+  },
+  "labelMessage": {
+    "message": "Missatge"
+  },
+  "labelScheduledFor": {
+    "message": "⏰ Enviament programat per: <strong>$1</strong>"
+  },
+  "buttonSave": {
+    "message": "Desar"
+  },
+  "buttonCancel": {
+    "message": "Cancel·lar"
+  },
+  "statusScheduled": {
+    "message": "⏱️ Programat"
+  },
+  "statusSending": {
+    "message": "📤 Enviant"
+  },
+  "statusSent": {
+    "message": "✅ Enviat"
+  },
+  "statusFailed": {
+    "message": "❌ Error"
+  },
+  "listEmpty": {
+    "message": "Encara no hi ha missatges"
+  },
+  "listError": {
+    "message": "Error en carregar la llista"
+  },
+  "buttonEdit": {
+    "message": "✏️ Editar"
+  },
+  "buttonDelete": {
+    "message": "🗑️ Cancel·lar"
+  },
+  "confirmCancelSend": {
+    "message": "Cancel·lar l'enviament d'aquest missatge?"
+  },
+  "errorTextTooLong": {
+    "message": "Text massa llarg"
+  },
+  "errorNoComposer": {
+    "message": "No hi ha quadre de text"
+  },
+  "errorChatNotFound": {
+    "message": "Xat no trobat: \"$1\""
+  },
+  "errorChatAmbiguous": {
+    "message": "Hi ha diversos xats que coincideixen amb \"$1\". Obre el correcte i torna-ho a provar."
+  },
+  "errorChatTimeout": {
+    "message": "Temps esgotat carregant el xat"
+  },
+  "buttonTooltip": {
+    "message": "Programar missatge (Ctrl+Shift+W)"
+  },
+  "errorCreateAlarm": {
+    "message": "Error en crear l'alarma"
+  },
+  "errorMessageNotScheduled": {
+    "message": "El missatge no està programat"
+  },
+  "errorMessageNotFound": {
+    "message": "Missatge no trobat"
+  },
+  "errorNoWhatsAppTab": {
+    "message": "No hi ha cap pestanya de WhatsApp Web oberta"
+  },
+  "errorFindTab": {
+    "message": "Error cercant la pestanya de WhatsApp: $1"
+  },
+  "errorContentScriptCommunication": {
+    "message": "Error comunicant amb el content script: $1"
+  },
+  "toastLongLimit": {
+    "message": "El missatge supera els 4096 caràcters"
+  },
+  "listTitle": {
+    "message": "Programats"
+  },
+  "listLoading": {
+    "message": "Carregant..."
+  },
+  "labelChatUnknown": {
+    "message": "(no detectat)"
+  },
+  "toastMessageUpdated": {
+    "message": "✓ Missatge actualitzat"
+  },
+  "listSubtitle": {
+    "message": "Historial d'enviaments"
+  }
+}

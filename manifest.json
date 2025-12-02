@@ -1,8 +1,9 @@
 {
   "manifest_version": 2,
-  "name": "WhatsApp Scheduler",
+  "name": "__MSG_extName__",
   "version": "2.1",
-  "description": "Programa mensajes en WhatsApp Web.",
+  "description": "__MSG_extDescription__",
+  "default_locale": "en",
   "permissions": [
     "tabs",
     "alarms",

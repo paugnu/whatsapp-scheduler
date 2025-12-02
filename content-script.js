@@ -136,6 +136,13 @@ function findChatSearchBox() {
     return null;
 }
 
+function clearSearchBox(searchBox) {
+    if (!searchBox) return;
+    searchBox.focus();
+    document.execCommand("selectAll", false, null);
+    document.execCommand("delete", false, null);
+}
+
 async function openChatByTitle(title) {
     if (!title) return false;
 
@@ -178,22 +185,44 @@ async function openChatByTitle(title) {
         return false;
     }
 
-    searchBox.focus();
-    document.execCommand("selectAll", false, null);
-    document.execCommand("delete", false, null);
+    // Buscar usando el cuadro de búsqueda y seleccionar el primer resultado
+    clearSearchBox(searchBox);
     document.execCommand("insertText", false, title);
 
-    await sleep(800);
+    // Esperar a que aparezcan resultados y probar varios ciclos
+    const maxSearchAttempts = 5;
+    for (let i = 0; i < maxSearchAttempts; i++) {
+        await sleep(400);
 
-    if (tryClickFromList()) {
-        setTimeout(() => {
-            document.execCommand("selectAll", false, null);
-            document.execCommand("delete", false, null);
-        }, 500);
-        return true;
+        // Si el resultado está visible, selecciónalo
+        if (tryClickFromList()) {
+            setTimeout(() => clearSearchBox(searchBox), 500);
+            return true;
+        }
+
+        // Como fallback, intenta abrir el primer resultado con Enter
+        const firstResult = document.querySelector('[data-testid="cell-frame-container"]');
+        if (firstResult) {
+            firstResult.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                    key: "Enter",
+                    code: "Enter",
+                    keyCode: 13,
+                    which: 13,
+                    bubbles: true,
+                    cancelable: true
+                })
+            );
+            await sleep(300);
+            if (tryClickFromList()) {
+                setTimeout(() => clearSearchBox(searchBox), 500);
+                return true;
+            }
+        }
     }
 
     console.warn("[WA Scheduler] No se encontró el chat tras buscar:", title);
+    clearSearchBox(searchBox);
     return false;
 }
 

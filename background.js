@@ -1,26 +1,84 @@
-// Compatibilidad Firefox/Chrome
+// Firefox/Chrome compatibility
 if (typeof browser === "undefined") {
     var browser = chrome;
 }
 
 console.log("[BG] Background script iniciado");
 
-// Localización con fallback
+const AVAILABLE_LOCALES = ["ca", "de", "en", "es", "fr", "hi", "id", "it", "nl", "pt_BR", "ru"];
+let localeMessages = {};
+let currentLocale = "en";
+let localeReady = loadLocaleMessages();
+
+function normalizeLocale(locale = "") {
+    const lc = locale.toLowerCase();
+    if (lc === "pt-br" || lc === "pt_br") return "pt_BR";
+    if (AVAILABLE_LOCALES.includes(lc)) return lc;
+
+    const base = lc.split(/[-_]/)[0];
+    if (AVAILABLE_LOCALES.includes(base)) return base;
+    return null;
+}
+
+async function loadLocaleMessages() {
+    const acceptLanguages =
+        (await browser?.i18n?.getAcceptLanguages?.().catch(() => [])) || [];
+    const candidates = [...acceptLanguages, currentLocale, "en"];
+
+    for (const candidate of candidates) {
+        const normalized = normalizeLocale(candidate);
+        if (!normalized) continue;
+
+        try {
+            const url = browser.runtime.getURL(`_locales/${normalized}/messages.json`);
+            const res = await fetch(url);
+            if (res.ok) {
+                localeMessages = await res.json();
+                currentLocale = normalized;
+                return;
+            }
+        } catch (e) {
+            console.warn("[BG] Failed to load locale", candidate, e);
+        }
+    }
+
+    localeMessages = {};
+    currentLocale = "en";
+}
+
+function applySubstitutions(template, substitutions = []) {
+    return template.replace(/\$([0-9]+)/g, (_, index) => substitutions[index - 1] ?? "");
+}
+
 function t(key, substitutions = []) {
+    const template = localeMessages?.[key]?.message;
+    if (template) return applySubstitutions(template, substitutions);
+
     try {
-        return browser?.i18n?.getMessage(key, substitutions) || key;
+        const native = browser?.i18n?.getMessage(key, substitutions);
+        if (native) return native;
     } catch (e) {
-        return key;
+        // Fallback handled below
+    }
+
+    return key;
+}
+
+async function ensureLocaleReady() {
+    try {
+        await localeReady;
+    } catch (e) {
+        console.warn("[BG] Locale preload failed", e);
     }
 }
 
-// Estado en memoria
+// In-memory state
 let scheduledMessages = {};
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000;
 
 // -------------------------
-// Cargar desde storage
+// Load from storage
 // -------------------------
 
 function loadMessages() {
@@ -31,7 +89,7 @@ function loadMessages() {
             }
             console.log("[BG] Cargados", Object.keys(scheduledMessages).length, "mensajes");
             
-            // Replanificar alarmas para mensajes pendientes
+            // Reschedule alarms for pending messages
             reschedulePendingMessages();
         })
         .catch((e) => console.error("[BG] Error cargando:", e));
@@ -43,7 +101,7 @@ function saveMessages() {
 }
 
 // -------------------------
-// Replanificar mensajes pendientes (en caso de reinicio)
+// Reschedule pending messages (after restart)
 // -------------------------
 
 function reschedulePendingMessages() {
@@ -61,13 +119,13 @@ function reschedulePendingMessages() {
 }
 
 // -------------------------
-// Mensajes desde content-script
+// Messages from the content script
 // -------------------------
 
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log("[BG] Mensaje recibido:", message.type);
 
-    // SCHEDULE_MESSAGE: programar un nuevo mensaje
+    // SCHEDULE_MESSAGE: schedule a new message
     if (message.type === "SCHEDULE_MESSAGE") {
         try {
             const id = "msg_" + Date.now();
@@ -113,7 +171,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
-    // GET_MESSAGES: obtener lista de mensajes
+    // GET_MESSAGES: retrieve the message list
     if (message.type === "GET_MESSAGES") {
         browser.storage.local.get("scheduledMessages")
             .then((data) => {
@@ -128,7 +186,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
-    // DELIVERY_REPORT: marcar como enviado/falló
+    // DELIVERY_REPORT: mark as delivered/failed
     if (message.type === "DELIVERY_REPORT") {
         const msg = scheduledMessages[message.id];
         if (msg) {
@@ -149,7 +207,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return false;
     }
 
-    // CANCEL_MESSAGE: cancelar un mensaje programado
+    // CANCEL_MESSAGE: cancel a scheduled message
     if (message.type === "CANCEL_MESSAGE") {
         const msg = scheduledMessages[message.id];
         if (msg && msg.status === "scheduled") {
@@ -172,7 +230,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
-    // EDIT_MESSAGE: editar un mensaje antes de enviarlo
+    // EDIT_MESSAGE: edit a message before delivery
     if (message.type === "EDIT_MESSAGE") {
         const msg = scheduledMessages[message.id];
         if (msg && msg.status === "scheduled") {
@@ -184,7 +242,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     msg.delayMs = message.delayMs;
                     msg.sendAt = Date.now() + message.delayMs;
                     
-                    // Actualizar alarma
+                    // Update alarm
                     browser.alarms.clear(message.id);
                     browser.alarms.create(message.id, { when: msg.sendAt });
                     
@@ -211,7 +269,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // -------------------------
-// Alarmas: dispara el envío
+// Alarms: trigger scheduled delivery
 // -------------------------
 
 browser.alarms.onAlarm.addListener(async (alarm) => {
@@ -274,13 +332,13 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
 });
 
 // -------------------------
-// Inicializar al cargar
+// Initialize on load
 // -------------------------
 
 loadMessages();
 
 // -------------------------
-// Limpiar mensajes antiguos (opcional)
+// Cleanup old messages (optional)
 // -------------------------
 
 function cleanOldMessages() {
@@ -301,5 +359,5 @@ function cleanOldMessages() {
     }
 }
 
-// Limpiar cada 24 horas
+// Cleanup every 24 hours
 setInterval(cleanOldMessages, 24 * 60 * 60 * 1000);

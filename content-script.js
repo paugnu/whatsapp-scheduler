@@ -1,26 +1,90 @@
-// Compatibilidad Firefox/Chrome
+// Firefox/Chrome compatibility
 if (typeof browser === "undefined") {
     var browser = chrome;
 }
 
 console.log("[WA Scheduler] content-script cargado");
 
-// Localización con fallback
+const AVAILABLE_LOCALES = ["ca", "de", "en", "es", "fr", "hi", "id", "it", "nl", "pt_BR", "ru"];
+let localeMessages = {};
+let currentLocale = "en";
+let localeReady = loadLocaleMessages();
+
+function normalizeLocale(locale = "") {
+    const lc = locale.toLowerCase();
+    if (lc === "pt-br" || lc === "pt_br") return "pt_BR";
+    if (AVAILABLE_LOCALES.includes(lc)) return lc;
+
+    const base = lc.split(/[-_]/)[0];
+    if (AVAILABLE_LOCALES.includes(base)) return base;
+    return null;
+}
+
+async function loadLocaleMessages() {
+    const acceptLanguages =
+        (await browser?.i18n?.getAcceptLanguages?.().catch(() => [])) || [];
+    const navigatorLanguages = Array.isArray(navigator.languages)
+        ? navigator.languages
+        : navigator.language
+          ? [navigator.language]
+          : [];
+
+    const candidates = [...acceptLanguages, ...navigatorLanguages, currentLocale, "en"];
+
+    for (const candidate of candidates) {
+        const normalized = normalizeLocale(candidate);
+        if (!normalized) continue;
+
+        try {
+            const url = browser.runtime.getURL(`_locales/${normalized}/messages.json`);
+            const res = await fetch(url);
+            if (res.ok) {
+                localeMessages = await res.json();
+                currentLocale = normalized;
+                return;
+            }
+        } catch (e) {
+            console.warn("[WA Scheduler] Failed to load locale", candidate, e);
+        }
+    }
+
+    localeMessages = {};
+    currentLocale = "en";
+}
+
+function applySubstitutions(template, substitutions = []) {
+    return template.replace(/\$([0-9]+)/g, (_, index) => substitutions[index - 1] ?? "");
+}
+
 function t(key, substitutions = []) {
+    const template = localeMessages?.[key]?.message;
+    if (template) return applySubstitutions(template, substitutions);
+
     try {
-        return browser?.i18n?.getMessage(key, substitutions) || key;
+        const native = browser?.i18n?.getMessage(key, substitutions);
+        if (native) return native;
     } catch (e) {
-        return key;
+        // Fallback handled below
+    }
+
+    return key;
+}
+
+async function ensureLocaleReady() {
+    try {
+        await localeReady;
+    } catch (e) {
+        console.warn("[WA Scheduler] Locale preload failed", e);
     }
 }
 
 // -------------------------
-// Utilidades base
+// Base utilities
 // -------------------------
 
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
-// CLICK NUCLEAR: Dispara eventos pointer + mouse para satisfacer a React
+// CLICK NUCLEAR: fire pointer + mouse events so React handlers receive them
 function superClick(element) {
     if (!element) return;
     const opts = { bubbles: true, cancelable: true, view: window, buttons: 1 };
@@ -32,7 +96,7 @@ function superClick(element) {
     });
 }
 
-// Escribe texto en inputs contenteditable simulando pegado
+// Write text into contenteditable inputs simulating a paste
 function triggerInputEvent(element, value) {
     if (!element) return;
     element.focus();
@@ -43,7 +107,7 @@ function triggerInputEvent(element, value) {
 }
 
 // -------------------------
-// Estado: último textarea y botón asociados
+// State: last textarea and send button cached
 // -------------------------
 
 let lastInput = null;
@@ -51,7 +115,7 @@ let lastSendButton = null;
 let lastChatTitle = null;
 let chatCheckTimeout = null;
 
-// Localizar el input del chat activo (sin usar caché)
+// Find the active chat composer without using cache
 function findActiveComposer() {
     return (
         document.querySelector('.lexical-rich-text-input [contenteditable="true"][data-lexical-editor="true"]') ||
@@ -81,7 +145,7 @@ function setLastTargetsFromElement(el) {
     console.log("[WA Scheduler] lastInput actualizado, lastSendButton:", !!lastSendButton);
 }
 
-// Detectar clicks/focus en el editor (con throttling)
+// Detect clicks/focus in the editor (with throttling)
 let focusTimeout = null;
 document.addEventListener(
     "focusin",
@@ -105,7 +169,7 @@ document.addEventListener(
 );
 
 // -------------------------
-// Detectar título del chat actual (solo panel derecho #main)
+// Detect the active chat title (right panel #main only)
 // -------------------------
 
 function getActiveChatTitle() {
@@ -125,7 +189,7 @@ function getActiveChatTitle() {
 }
 
 // -------------------------
-// Normalizar y comparar nombres
+// Normalize and compare chat names
 // -------------------------
 
 function normalizeName(s) {
@@ -147,7 +211,7 @@ function namesMatch(target, candidate) {
 }
 
 // -------------------------
-// Abrir chat por título
+// Open chat by title
 // -------------------------
 
 function clearSearchBox(searchBox) {
@@ -225,7 +289,7 @@ async function searchAndOpenChat(title) {
 }
 
 // -------------------------
-// Mostrar toast notifications
+// Toast notifications
 // -------------------------
 
 function showToast(msg, type = "info", duration = 3000) {
@@ -255,7 +319,7 @@ function showToast(msg, type = "info", duration = 3000) {
         word-wrap: break-word;
     `;
 
-    // 👉 aquí el texto:
+    // Insert the message text
     toast.textContent = msg;
 
     const style = document.createElement("style");
@@ -294,11 +358,11 @@ function showToast(msg, type = "info", duration = 3000) {
     }, duration);
 }
 
-// Iniciar sincronización del chat activo
+// Start synchronization for the active chat
 startChatObserver();
 
 // -------------------------
-// Escribir mensaje y enviarlo
+// Write and send a message
 // -------------------------
 
 function sendMessageInActiveChat(text) {
@@ -330,10 +394,12 @@ function sendMessageInActiveChat(text) {
 }
 
 // -------------------------
-// Envío al chat programado
+// Send to the scheduled chat
 // -------------------------
 
 async function sendToScheduledChat(id, text, chatTitle) {
+    await ensureLocaleReady();
+
     console.log("--- Procesando:", chatTitle);
 
     if (!chatTitle) {
@@ -391,7 +457,7 @@ async function sendToScheduledChat(id, text, chatTitle) {
 }
 
 // -------------------------
-// Mantener sincronizado el input con el chat activo
+// Keep composer/input synchronized with the active chat
 // -------------------------
 
 function startChatObserver() {
@@ -409,23 +475,25 @@ function startChatObserver() {
         }
     };
 
-    // Observador ligero del header
+    // Lightweight observer on the header
     const header = document.querySelector("header");
     if (header) {
         const mo = new MutationObserver(() => updateTargetsForChat());
         mo.observe(header, { childList: true, subtree: true, characterData: true });
     }
 
-    // Fallback periódico por si el observer no detecta cambios
+    // Periodic fallback in case the observer misses changes
     setInterval(updateTargetsForChat, 1500);
 }
 
 // -------------------------
-// Modal para editar mensajes
+// Edit modal
 // -------------------------
 
-function openEditDialog(msgId, msg) {
-    // Remover modal anterior si existe
+async function openEditDialog(msgId, msg) {
+    await ensureLocaleReady();
+
+    // Remove existing modal if present
     const existing = document.getElementById("wa-edit-modal");
     if (existing) existing.remove();
 
@@ -542,7 +610,7 @@ function openEditDialog(msgId, msg) {
     modal.appendChild(content);
     document.body.appendChild(modal);
 
-    // Contador de caracteres
+    // Character counter
     const textInput = document.getElementById("wa-edit-text");
     const charCount = document.getElementById("wa-edit-char-count");
 
@@ -557,16 +625,16 @@ function openEditDialog(msgId, msg) {
         }
     });
 
-    // Focus al texto
+    // Focus on the textarea
     setTimeout(() => textInput.focus(), 100);
 
-    // Botón cancelar
+    // Cancel button
     document.getElementById("wa-edit-cancel").addEventListener("click", () => {
         modal.style.animation = "slideOut 0.3s ease-in";
         setTimeout(() => modal.remove(), 300);
     });
 
-    // Cerrar con ESC
+    // Close with ESC
     const escapeHandler = (e) => {
         if (e.key === "Escape") {
             modal.style.animation = "slideOut 0.3s ease-in";
@@ -578,7 +646,7 @@ function openEditDialog(msgId, msg) {
     };
     document.addEventListener("keydown", escapeHandler);
 
-    // Botón guardar
+    // Save button
     document.getElementById("wa-edit-save").addEventListener("click", () => {
         const newText = textInput.value.trim();
         const newHours = parseInt(document.getElementById("wa-edit-hours").value || "0", 10);
@@ -625,7 +693,7 @@ function openEditDialog(msgId, msg) {
         );
     });
 
-    // Cerrar clickeando fuera del modal
+    // Close when clicking outside the modal
     modal.addEventListener("click", (e) => {
         if (e.target === modal) {
             modal.style.animation = "slideOut 0.3s ease-in";
@@ -638,9 +706,11 @@ function openEditDialog(msgId, msg) {
 }
 
 // -------------------------
-// Panel de lista (mejorado)
+// Enhanced list panel
 
-function renderListPanel() {
+async function renderListPanel() {
+    await ensureLocaleReady();
+
     const existing = document.getElementById("wa-scheduler-list");
     if (existing) existing.remove();
 
@@ -768,7 +838,7 @@ function renderListPanel() {
             body.appendChild(row);
         });
 
-        // Event listeners para botones de editar y cancelar
+        // Event listeners for edit and cancel buttons
         document.querySelectorAll(".wa-list-edit").forEach((btn) => {
             btn.addEventListener("mouseover", () => {
                 btn.style.background = "rgba(59, 130, 246, 1)";
@@ -818,10 +888,12 @@ function renderListPanel() {
 }
 
 // -------------------------
-// Panel de programación (mejorado)
+// Enhanced scheduling panel
 // -------------------------
 
-function createSchedulerUI() {
+async function createSchedulerUI() {
+    await ensureLocaleReady();
+
     if (document.getElementById("wa-scheduler-panel")) return;
 
     const panel = document.createElement("div");
@@ -971,7 +1043,7 @@ function createSchedulerUI() {
 
     document.body.appendChild(panel);
 
-    // Actualizar contador de caracteres
+    // Character counter
     const msgInput = document.getElementById("wa-msg");
     const charCount = document.getElementById("wa-char-count");
     msgInput.addEventListener("input", () => {
@@ -1034,15 +1106,17 @@ function createSchedulerUI() {
         );
     };
 
-    // Focus al campo de texto
+    // Focus on the text field
     setTimeout(() => msgInput.focus(), 100);
 }
 
 // -------------------------
-// Botón flotante
+// Floating button
 // -------------------------
 
-function createFloatingButton() {
+async function createFloatingButton() {
+    await ensureLocaleReady();
+
     if (document.getElementById("wa-scheduler-button")) return;
 
     const btn = document.createElement("button");
@@ -1089,7 +1163,7 @@ function createFloatingButton() {
 setTimeout(createFloatingButton, 3000);
 
 // -------------------------
-// Atajos de teclado
+// Keyboard shortcuts
 // -------------------------
 
 document.addEventListener("keydown", (e) => {
@@ -1100,7 +1174,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 // -------------------------
-// Mensajes desde background
+// Messages from background
 // -------------------------
 
 browser.runtime.onMessage.addListener((msg) => {

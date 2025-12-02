@@ -104,6 +104,9 @@
   "errorChatNotFound": {
     "message": "Discussion introuvable : \"$1\""
   },
+  "errorChatAmbiguous": {
+    "message": "Plusieurs discussions correspondent à \"$1\". Ouvrez la bonne puis réessayez."
+  },
   "errorChatTimeout": {
     "message": "Délai dépassé lors du chargement de la discussion"
   },

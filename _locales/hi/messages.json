@@ -104,6 +104,9 @@
   "errorChatNotFound": {
     "message": "चैट नहीं मिली: \"$1\""
   },
+  "errorChatAmbiguous": {
+    "message": "एक से अधिक चैट \"$1\" से मेल खाती हैं। कृपया सही चैट खोलकर फिर से प्रयास करें।"
+  },
   "errorChatTimeout": {
     "message": "चैट लोड करते समय समय समाप्त"
   },

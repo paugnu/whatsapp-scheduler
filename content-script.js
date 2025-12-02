@@ -200,14 +200,28 @@ function normalizeName(s) {
         .toLowerCase();
 }
 
-function namesMatch(target, candidate) {
+function nameMatchScore(target, candidate) {
     const t = normalizeName(target);
     const c = normalizeName(candidate);
 
-    if (!t || !c) return false;
-    if (t === c) return true;
-    if (c.includes(t)) return true;
-    return false;
+    if (!t || !c) return 0;
+    if (t === c) return 3;
+
+    if (c.startsWith(t)) {
+        const rest = c.slice(t.length);
+        if (rest === "" || /^([\s\(\[\{.,-]|–|—)/.test(rest)) return 2;
+    }
+
+    if (t.startsWith(c)) {
+        const rest = t.slice(c.length);
+        if (rest === "" || /^([\s\(\[\{.,-]|–|—)/.test(rest)) return 1;
+    }
+
+    return 0;
+}
+
+function namesMatch(target, candidate) {
+    return nameMatchScore(target, candidate) > 0;
 }
 
 // -------------------------
@@ -222,30 +236,44 @@ function clearSearchBox(searchBox) {
 }
 
 function openChatByTitle(title) {
-    if (!title) return false;
+    if (!title) return { found: false };
 
     const sidePane = document.getElementById("pane-side") || document.body;
     const candidates = sidePane.querySelectorAll('span[dir="auto"]');
+    const matches = [];
 
     for (const span of candidates) {
         const text = span.textContent || span.getAttribute("title");
         if (!text) continue;
 
-        if (namesMatch(title, text)) {
+        const score = nameMatchScore(title, text);
+        if (score > 0) {
             const row = span.closest('div[role="row"]') || span.closest('div[role="button"]');
-
             if (row) {
-                console.log(`[WA Scheduler] Chat encontrado: "${text}". Abriendo...`);
-                row.scrollIntoView({ block: "center", behavior: "instant" });
-
-                superClick(span);
-                superClick(row);
-
-                return true;
+                matches.push({ span, row, text, score });
             }
         }
     }
-    return false;
+
+    if (!matches.length) return { found: false };
+
+    matches.sort((a, b) => b.score - a.score);
+    const bestScore = matches[0].score;
+    const bestMatches = matches.filter((m) => m.score === bestScore);
+
+    if (bestMatches.length > 1) {
+        showToast(t("errorChatAmbiguous", [title]), "warning", 6000);
+        return { found: false, reason: "ambiguous" };
+    }
+
+    const match = bestMatches[0];
+    console.log(`[WA Scheduler] Chat encontrado: "${match.text}". Abriendo...`);
+    match.row.scrollIntoView({ block: "center", behavior: "instant" });
+
+    superClick(match.span);
+    superClick(match.row);
+
+    return { found: true };
 }
 
 async function searchAndOpenChat(title) {
@@ -274,18 +302,20 @@ async function searchAndOpenChat(title) {
 
     await delay(1800);
 
-    const found = openChatByTitle(title);
+    const result = openChatByTitle(title);
 
-    if (found) {
+    if (result.found) {
         await delay(1500);
         const clearBtn =
             document.querySelector('[data-icon="x-alt"]')?.closest('div[role="button"]') ||
             document.querySelector('[data-icon="back"]')?.closest('div[role="button"]');
         if (clearBtn) superClick(clearBtn);
-        return true;
+        return { found: true };
     }
 
-    return false;
+    return result.reason === "ambiguous"
+        ? { found: false, reason: "ambiguous" }
+        : { found: false };
 }
 
 // -------------------------
@@ -424,13 +454,16 @@ async function sendToScheduledChat(id, text, chatTitle) {
         return;
     }
 
-    let opened = openChatByTitle(chatTitle);
-    if (!opened) {
-        opened = await searchAndOpenChat(chatTitle);
+    let openResult = openChatByTitle(chatTitle);
+    if (!openResult.found) {
+        openResult = await searchAndOpenChat(chatTitle);
     }
 
-    if (!opened) {
-        browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: false, error: t("errorChatNotFound", [chatTitle]) });
+    if (!openResult.found) {
+        const err = openResult.reason === "ambiguous"
+            ? t("errorChatAmbiguous", [chatTitle])
+            : t("errorChatNotFound", [chatTitle]);
+        browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: false, error: err });
         return;
     }
 

@@ -104,6 +104,9 @@
   "errorChatNotFound": {
     "message": "Xat no trobat: \"$1\""
   },
+  "errorChatAmbiguous": {
+    "message": "Hi ha diversos xats que coincideixen amb \"$1\". Obre el correcte i torna-ho a provar."
+  },
   "errorChatTimeout": {
     "message": "Temps esgotat carregant el xat"
   },

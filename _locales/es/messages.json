@@ -104,6 +104,9 @@
   "errorChatNotFound": {
     "message": "Chat no encontrado: \"$1\""
   },
+  "errorChatAmbiguous": {
+    "message": "Varios chats coinciden con \"$1\". Abre el correcto y vuelve a intentarlo."
+  },
   "errorChatTimeout": {
     "message": "Tiempo agotado cargando el chat"
   },

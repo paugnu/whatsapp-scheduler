@@ -104,6 +104,9 @@
   "errorChatNotFound": {
     "message": "Obrolan tidak ditemukan: \"$1\""
   },
+  "errorChatAmbiguous": {
+    "message": "Beberapa obrolan cocok dengan \"$1\". Buka obrolan yang benar lalu coba lagi."
+  },
   "errorChatTimeout": {
     "message": "Waktu habis saat memuat obrolan"
   },

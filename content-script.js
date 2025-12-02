@@ -493,6 +493,70 @@ async function sendToScheduledChat(id, text, chatTitle) {
 // Keep composer/input synchronized with the active chat
 // -------------------------
 
+// Attach a schedule button next to the native send button in the footer
+function attachScheduleButtonToComposer() {
+    const sendButton =
+        document.querySelector('footer button[aria-label="Send"]') ||
+        document.querySelector('footer button[aria-label="Enviar"]') ||
+        document.querySelector('footer button[aria-label="Enviar mensaje"]') ||
+        (document.querySelector('footer span[data-icon="send"]') &&
+            document.querySelector('footer span[data-icon="send"]').closest("button"));
+
+    const existing = document.getElementById("wa-inline-schedule-button");
+
+    if (!sendButton) {
+        if (existing) existing.remove();
+        return false;
+    }
+
+    const footer = sendButton.closest("footer") || document.querySelector("footer");
+    const container = sendButton.parentElement;
+    if (!container || !footer) return false;
+
+    if (existing) {
+        if (existing.closest("footer") === footer) return true;
+        existing.remove();
+    }
+
+    const btn = document.createElement("button");
+    btn.id = "wa-inline-schedule-button";
+    btn.type = "button";
+    btn.textContent = "📅";
+    btn.title = "Programar mensaje";
+    btn.style.cssText = `
+        border: none;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        padding: 6px 8px;
+        margin-right: 4px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: ${sendButton.offsetHeight || 40}px;
+        min-width: 38px;
+        transition: background 0.2s ease;
+        font-size: 16px;
+    `;
+
+    btn.onmouseover = () => {
+        btn.style.background = "rgba(37, 211, 102, 0.12)";
+    };
+    btn.onmouseout = () => {
+        btn.style.background = "transparent";
+    };
+
+    btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        createSchedulerUI();
+    });
+
+    container.insertBefore(btn, sendButton);
+    return true;
+}
+
 function startChatObserver() {
     const updateTargetsForChat = () => {
         const current = getActiveChatTitle();
@@ -506,6 +570,8 @@ function startChatObserver() {
                 setLastTargetsFromElement(composer);
             }
         }
+
+        attachScheduleButtonToComposer();
     };
 
     // Lightweight observer on the header
@@ -963,8 +1029,7 @@ async function createSchedulerUI() {
                     opacity: 1;
                 }
             }
-            #wa-scheduler-panel input,
-            #wa-scheduler-panel textarea {
+            #wa-scheduler-panel input {
                 background: rgba(255, 255, 255, 0.1);
                 border: 1px solid rgba(255, 255, 255, 0.2);
                 color: white;
@@ -974,16 +1039,20 @@ async function createSchedulerUI() {
                 font-family: inherit;
                 transition: all 0.2s;
             }
-            #wa-scheduler-panel input:focus,
-            #wa-scheduler-panel textarea:focus {
+            #wa-scheduler-panel input:focus {
                 background: rgba(255, 255, 255, 0.15);
                 border-color: #25D366;
                 outline: none;
                 box-shadow: 0 0 8px rgba(37, 211, 102, 0.3);
             }
-            #wa-scheduler-panel input::placeholder,
-            #wa-scheduler-panel textarea::placeholder {
+            #wa-scheduler-panel input::placeholder {
                 color: rgba(255, 255, 255, 0.5);
+            }
+            #wa-scheduler-panel label {
+                display: block;
+                font-size: 11px;
+                opacity: 0.8;
+                margin-bottom: 4px;
             }
         </style>
 
@@ -994,60 +1063,68 @@ async function createSchedulerUI() {
             <div style="opacity: 0.9;">${chatTitle}</div>
         </div>
 
-        <textarea id="wa-msg"
-            placeholder="${t("placeholderMessage")}"
-            style="width: 100%; height: 70px; margin-bottom: 10px; resize: vertical;"></textarea>
+        <div style="background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px; font-size: 11px; margin-bottom: 12px; line-height: 1.35;">
+            📄 Se enviará el mensaje que tienes escrito ahora en este chat.
+        </div>
 
-        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-    <div style="flex: 1;">
-        <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px;">
-            ${t("labelHours")}
-        </label>
-        <input id="wa-hours"
-               type="number"
-               min="0"
-               max="999"
-               value="0"
-               style="
-                   width: 100%;
-                   padding: 6px 8px;
-                   border-radius: 6px;
-                   border: 1px solid rgba(255,255,255,0.18);
-                   background: rgba(32,44,51,0.95);
-                   color: #e9edef;
-                   font-size: 12px;
-                   box-sizing: border-box;
-                   -moz-appearance: textfield;
-                   appearance: textfield;
-               ">
-    </div>
+        <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 11px; opacity: 0.85; margin: 0;">
+                <input type="radio" name="wa-mode" id="wa-mode-delay" value="delay" checked style="width: 14px; height: 14px;">
+                <span>${"Enviar dentro de X minutos"}</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 11px; opacity: 0.85; margin: 0;">
+                <input type="radio" name="wa-mode" id="wa-mode-datetime" value="datetime" style="width: 14px; height: 14px;">
+                <span>${"Enviar en una fecha y hora concretas"}</span>
+            </label>
+        </div>
 
-    <div style="flex: 1;">
-        <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px;">
-            ${t("labelMinutes")}
-        </label>
-        <input id="wa-mins"
-               type="number"
-               min="0"
-               max="59"
-               value="0"
-               style="
-                   width: 100%;
-                   padding: 6px 8px;
-                   border-radius: 6px;
-                   border: 1px solid rgba(255,255,255,0.18);
-                   background: rgba(32,44,51,0.95);
-                   color: #e9edef;
-                   font-size: 12px;
-                   box-sizing: border-box;
-                   -moz-appearance: textfield;
-                   appearance: textfield;
-               ">
-    </div>
-</div>
+        <div id="wa-delay-fields" style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <div style="flex: 1;">
+                <label>${t("labelHours")}</label>
+                <input id="wa-hours"
+                       type="number"
+                       min="0"
+                       max="999"
+                       value="0"
+                       style="
+                           width: 100%;
+                           padding: 6px 8px;
+                           border-radius: 6px;
+                           border: 1px solid rgba(255,255,255,0.18);
+                           background: rgba(32,44,51,0.95);
+                           color: #e9edef;
+                           font-size: 12px;
+                           box-sizing: border-box;
+                           -moz-appearance: textfield;
+                           appearance: textfield;
+                       ">
+            </div>
 
-        <div style="display: flex; gap: 2px; font-size: 10px; opacity: 0.7; margin-bottom: 12px;">
-            <span id="wa-char-count">0</span> / 4096
+            <div style="flex: 1;">
+                <label>${t("labelMinutes")}</label>
+                <input id="wa-mins"
+                       type="number"
+                       min="0"
+                       max="59"
+                       value="0"
+                       style="
+                           width: 100%;
+                           padding: 6px 8px;
+                           border-radius: 6px;
+                           border: 1px solid rgba(255,255,255,0.18);
+                           background: rgba(32,44,51,0.95);
+                           color: #e9edef;
+                           font-size: 12px;
+                           box-sizing: border-box;
+                           -moz-appearance: textfield;
+                           appearance: textfield;
+                       ">
+            </div>
+        </div>
+
+        <div id="wa-datetime-field" style="margin-bottom: 12px; display: none;">
+            <label>${"Fecha y hora exactas"}</label>
+            <input id="wa-datetime" type="datetime-local" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.18); background: rgba(32,44,51,0.95); color: #e9edef;">
         </div>
 
         <div style="display: flex; gap: 6px; margin-bottom: 0;">
@@ -1076,27 +1153,30 @@ async function createSchedulerUI() {
 
     document.body.appendChild(panel);
 
-    // Character counter
-    const msgInput = document.getElementById("wa-msg");
-    const charCount = document.getElementById("wa-char-count");
-    msgInput.addEventListener("input", () => {
-        charCount.textContent = msgInput.value.length;
-        if (msgInput.value.length > 4096) {
-            charCount.style.color = "#dc2626";
-        } else if (msgInput.value.length > 3500) {
-            charCount.style.color = "#f59e0b";
-        } else {
-            charCount.style.color = "rgba(255,255,255,0.7)";
-        }
-    });
+    const delayFields = document.getElementById("wa-delay-fields");
+    const datetimeField = document.getElementById("wa-datetime-field");
+    const delayRadio = document.getElementById("wa-mode-delay");
+    const datetimeRadio = document.getElementById("wa-mode-datetime");
+
+    const updateMode = () => {
+        const useDelay = delayRadio.checked;
+        delayFields.style.display = useDelay ? "flex" : "none";
+        datetimeField.style.display = useDelay ? "none" : "block";
+    };
+
+    delayRadio.addEventListener("change", updateMode);
+    datetimeRadio.addEventListener("change", updateMode);
+    updateMode();
 
     document.getElementById("wa-close").onclick = () => panel.remove();
     document.getElementById("wa-list").onclick = () => renderListPanel();
 
     document.getElementById("wa-schedule").onclick = () => {
-        const text = document.getElementById("wa-msg").value.trim();
+        const composer = findActiveComposer();
+        const text = composer?.innerText?.trim() || composer?.textContent?.trim() || "";
         const hours = parseInt(document.getElementById("wa-hours").value || "0", 10);
         const mins = parseInt(document.getElementById("wa-mins").value || "0", 10);
+        const datetimeValue = document.getElementById("wa-datetime").value;
 
         if (!text) {
             showToast(t("toastWriteMessage"), "warning");
@@ -1108,13 +1188,30 @@ async function createSchedulerUI() {
             return;
         }
 
-        const totalMins = hours * 60 + mins;
-        if (totalMins <= 0) {
-            showToast(t("toastNeedTime"), "warning");
-            return;
+        let delayMs = 0;
+        let totalMins = 0;
+
+        if (delayRadio.checked) {
+            totalMins = hours * 60 + mins;
+            if (totalMins <= 0) {
+                showToast(t("toastNeedTime"), "warning");
+                return;
+            }
+            delayMs = totalMins * 60 * 1000;
+        } else {
+            if (!datetimeValue) {
+                showToast("Selecciona una fecha y hora", "warning");
+                return;
+            }
+            const sendAt = new Date(datetimeValue).getTime();
+            delayMs = sendAt - Date.now();
+            if (!sendAt || Number.isNaN(sendAt) || delayMs <= 0) {
+                showToast("La fecha debe ser futura", "error");
+                return;
+            }
+            totalMins = Math.ceil(delayMs / 60000);
         }
 
-        const delayMs = totalMins * 60 * 1000;
         const chatTitle = getActiveChatTitle();
 
         browser.runtime.sendMessage(
@@ -1126,11 +1223,10 @@ async function createSchedulerUI() {
             },
             (resp) => {
                 if (resp && resp.ok) {
-                    showToast(t("toastScheduledMinutes", [totalMins]), "success");
-                    msgInput.value = "";
-                    document.getElementById("wa-hours").value = "0";
-                    document.getElementById("wa-mins").value = "0";
-                    charCount.textContent = "0";
+                    const toastMsg = delayRadio.checked
+                        ? t("toastScheduledMinutes", [totalMins])
+                        : t("toastScheduledMinutes", [totalMins]);
+                    showToast(toastMsg, "success");
                     setTimeout(() => panel.remove(), 500);
                 } else {
                     showToast(t("toastErrorWithDetail", [resp?.error || t("errorNoResponse")]), "error", 5000);
@@ -1138,9 +1234,86 @@ async function createSchedulerUI() {
             }
         );
     };
+}
 
-    // Focus on the text field
-    setTimeout(() => msgInput.focus(), 100);
+// -------------------------
+// Sidebar icon entrypoint
+// -------------------------
+
+// Create an icon in the left navigation bar to toggle the scheduled list
+async function createSidebarIcon() {
+    await ensureLocaleReady();
+
+    if (document.getElementById("wa-sidebar-scheduler")) return;
+
+    const selectors = [
+        '[data-testid="app-bar"]',
+        'header nav',
+        'div[role="navigation"]',
+        '[data-testid="chat-list-header"] nav',
+        '#app nav'
+    ];
+
+    let container = null;
+    for (const sel of selectors) {
+        const el = document.querySelector(sel);
+        if (el) {
+            container = el;
+            break;
+        }
+    }
+
+    if (!container) {
+        const settingsBtn =
+            document.querySelector('span[data-icon="settings"]')?.closest("button") ||
+            document.querySelector('button[aria-label*="Settings"]');
+        container = settingsBtn?.parentElement || null;
+    }
+
+    if (!container) {
+        console.warn("[WA Scheduler] No sidebar container found, keeping floating button fallback");
+        return;
+    }
+
+    const btn = document.createElement("button");
+    btn.id = "wa-sidebar-scheduler";
+    btn.type = "button";
+    btn.textContent = "📅";
+    btn.title = t("listTitle");
+    btn.style.cssText = `
+        border: none;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s ease;
+        font-size: 18px;
+        margin: 4px 0;
+    `;
+
+    btn.onmouseover = () => {
+        btn.style.background = "rgba(37, 211, 102, 0.12)";
+    };
+    btn.onmouseout = () => {
+        btn.style.background = "transparent";
+    };
+
+    btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const existing = document.getElementById("wa-scheduler-list");
+        if (existing) {
+            existing.remove();
+        } else {
+            renderListPanel();
+        }
+    });
+
+    container.appendChild(btn);
 }
 
 // -------------------------
@@ -1150,6 +1323,7 @@ async function createSchedulerUI() {
 async function createFloatingButton() {
     await ensureLocaleReady();
 
+    if (document.getElementById("wa-inline-schedule-button") || document.getElementById("wa-sidebar-scheduler")) return;
     if (document.getElementById("wa-scheduler-button")) return;
 
     const btn = document.createElement("button");
@@ -1193,7 +1367,13 @@ async function createFloatingButton() {
     console.log("[WA Scheduler] Botón flotante creado");
 }
 
-setTimeout(createFloatingButton, 3000);
+setTimeout(() => {
+    createSidebarIcon();
+    const attached = attachScheduleButtonToComposer();
+    if (!attached) {
+        createFloatingButton();
+    }
+}, 3000);
 
 // -------------------------
 // Keyboard shortcuts

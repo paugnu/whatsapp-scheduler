@@ -117,31 +117,83 @@ function namesMatch(target, candidate) {
 // Abrir chat por título
 // -------------------------
 
-function openChatByTitle(title) {
+function sleep(ms) {
+    return new Promise((res) => setTimeout(res, ms));
+}
+
+function findChatSearchBox() {
+    const selectors = [
+        '[data-testid="chat-list-search"] [contenteditable="true"]',
+        'div[role="textbox"][contenteditable="true"][data-tab="3"]',
+        'div[role="textbox"][contenteditable="true"][data-tab="2"]',
+        'div[contenteditable="true"][title]'
+    ];
+
+    for (const sel of selectors) {
+        const el = document.querySelector(sel);
+        if (el) return el;
+    }
+    return null;
+}
+
+async function openChatByTitle(title) {
     if (!title) return false;
 
-    const spans = document.querySelectorAll('span[dir="auto"][title], span[dir="auto"]');
+    const tryClickFromList = () => {
+        const spans = document.querySelectorAll('div[role="grid"] span[dir="auto"][title], div[role="grid"] span[dir="auto"]');
 
-    for (const span of spans) {
-        const tAttr = span.getAttribute("title");
-        const tText = (span.textContent || "").trim();
-        const candidate = tAttr || tText;
+        for (const span of spans) {
+            const tAttr = span.getAttribute("title");
+            const tText = (span.textContent || "").trim();
+            const candidate = tAttr || tText;
 
-        if (!candidate) continue;
+            if (!candidate) continue;
 
-        if (namesMatch(title, candidate)) {
-            let row =
-                span.closest('div[role="row"]') ||
-                span.closest('div[role="button"]') ||
-                span.closest('div[aria-label]') ||
-                span;
+            if (namesMatch(title, candidate)) {
+                let row =
+                    span.closest('div[role="row"]') ||
+                    span.closest('div[role="button"]') ||
+                    span.closest('div[aria-label]') ||
+                    span;
 
-            console.log("[WA Scheduler] Abriendo chat:", candidate, "(target:", title, ")");
-            row.click();
-            return true;
+                console.log("[WA Scheduler] Abriendo chat:", candidate, "(target:", title, ")");
+                row.click();
+                return true;
+            }
         }
+        return false;
+    };
+
+    // Si ya está abierto, no hagas nada
+    const current = getActiveChatTitle();
+    if (current && namesMatch(title, current)) {
+        return true;
     }
-    console.warn("[WA Scheduler] No se encontró el chat:", title);
+
+    if (tryClickFromList()) return true;
+
+    const searchBox = findChatSearchBox();
+    if (!searchBox) {
+        console.warn("[WA Scheduler] No se encontró el buscador de chats");
+        return false;
+    }
+
+    searchBox.focus();
+    document.execCommand("selectAll", false, null);
+    document.execCommand("delete", false, null);
+    document.execCommand("insertText", false, title);
+
+    await sleep(800);
+
+    if (tryClickFromList()) {
+        setTimeout(() => {
+            document.execCommand("selectAll", false, null);
+            document.execCommand("delete", false, null);
+        }, 500);
+        return true;
+    }
+
+    console.warn("[WA Scheduler] No se encontró el chat tras buscar:", title);
     return false;
 }
 
@@ -299,7 +351,7 @@ function sendMessageInActiveChat(text) {
 // Envío al chat programado
 // -------------------------
 
-function sendToScheduledChat(id, text, chatTitle) {
+async function sendToScheduledChat(id, text, chatTitle) {
     console.log("[WA Scheduler] Envío programado a:", chatTitle);
 
     if (!chatTitle) {
@@ -318,7 +370,7 @@ function sendToScheduledChat(id, text, chatTitle) {
         return;
     }
 
-    const opened = openChatByTitle(chatTitle);
+    const opened = await openChatByTitle(chatTitle);
     if (!opened) {
         console.error("[WA Scheduler] No se pudo localizar el chat:", chatTitle);
         browser.runtime.sendMessage({
@@ -331,9 +383,9 @@ function sendToScheduledChat(id, text, chatTitle) {
     }
 
     let tries = 0;
-    const maxTries = 12;
+    const maxTries = 14;
 
-    function waitForChat() {
+    while (tries < maxTries) {
         const current = getActiveChatTitle();
         console.log("[WA Scheduler] Esperando chat:", chatTitle, "/ activo:", current);
 
@@ -362,20 +414,16 @@ function sendToScheduledChat(id, text, chatTitle) {
         }
 
         tries++;
-        if (tries < maxTries) {
-            setTimeout(waitForChat, 500);
-        } else {
-            console.error("[WA Scheduler] Timeout esperando el chat correcto");
-            browser.runtime.sendMessage({
-                type: "DELIVERY_REPORT",
-                id,
-                ok: false,
-                error: `No se pudo abrir el chat "${chatTitle}".`
-            });
-        }
+        await sleep(500);
     }
 
-    setTimeout(waitForChat, 700);
+    console.error("[WA Scheduler] Timeout esperando el chat correcto");
+    browser.runtime.sendMessage({
+        type: "DELIVERY_REPORT",
+        id,
+        ok: false,
+        error: `No se pudo abrir el chat "${chatTitle}".`
+    });
 }
 
 // -------------------------
@@ -1095,6 +1143,8 @@ browser.runtime.onMessage.addListener((msg) => {
     if (msg.type === "SEND_SCHEDULED") {
         console.log("[WA Scheduler] SEND_SCHEDULED recibido:", msg);
         const { id, text, chatTitle } = msg;
-        sendToScheduledChat(id, text, chatTitle);
+        sendToScheduledChat(id, text, chatTitle).catch((err) =>
+            console.error("[WA Scheduler] Error en envío programado:", err)
+        );
     }
 });

@@ -5,6 +5,18 @@ if (typeof browser === "undefined") {
 
 console.log("[WA Scheduler] content-script cargado");
 
+function notifyBackgroundReady(retries = 5) {
+    browser.runtime
+        .sendMessage({ type: "WA_READY" })
+        .catch(() => {
+            if (retries > 0) {
+                setTimeout(() => notifyBackgroundReady(retries - 1), 2000);
+            }
+        });
+}
+
+setTimeout(() => notifyBackgroundReady(), 2000);
+
 const AVAILABLE_LOCALES = ["ca", "de", "en", "es", "fr", "hi", "id", "it", "nl", "pt_BR", "ru"];
 let localeMessages = {};
 let currentLocale = "en";

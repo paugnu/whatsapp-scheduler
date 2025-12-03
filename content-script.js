@@ -5,6 +5,14 @@ if (typeof browser === "undefined") {
 
 console.log("[WA Scheduler] content-script cargado");
 
+function isWhatsAppUIReady() {
+    return (
+        document.querySelector("#side") ||
+        document.querySelector("[data-testid=\"conversation-compose-box\"]") ||
+        document.querySelector("[contenteditable=\"true\"][data-lexical-editor=\"true\"]")
+    );
+}
+
 function notifyBackgroundReady(retries = 5) {
     browser.runtime
         .sendMessage({ type: "WA_READY" })
@@ -15,7 +23,27 @@ function notifyBackgroundReady(retries = 5) {
         });
 }
 
-setTimeout(() => notifyBackgroundReady(), 2000);
+function waitForWhatsAppReadySignal(maxWaitMs = 60000) {
+    const start = Date.now();
+
+    function check() {
+        if (isWhatsAppUIReady()) {
+            notifyBackgroundReady();
+            return;
+        }
+
+        if (Date.now() - start < maxWaitMs) {
+            setTimeout(check, 1000);
+        } else {
+            // Keep trying but slower to avoid spamming
+            setTimeout(check, 5000);
+        }
+    }
+
+    check();
+}
+
+waitForWhatsAppReadySignal();
 
 const AVAILABLE_LOCALES = ["ca", "de", "en", "es", "fr", "hi", "id", "it", "nl", "pt_BR", "ru"];
 let localeMessages = {};

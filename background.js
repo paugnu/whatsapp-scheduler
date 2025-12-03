@@ -78,10 +78,14 @@ const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000;
 const ALARM_PREFIX = "waScheduler::";
 const WHATSAPP_URL = "https://web.whatsapp.com/";
+const CREATED_TAB_SETTLE_MS = 4000;
+const EXISTING_TAB_SETTLE_MS = 1500;
 
 let readyTabs = new Set();
 const readyWaiters = new Map();
 let pendingCloseTabs = new Map();
+
+const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
 // -------------------------
 // Load from storage
@@ -347,6 +351,7 @@ async function ensureWhatsAppTabAndSend(msg) {
     const { tab, created } = await ensureWhatsAppTab();
 
     await waitForWhatsAppReady(tab.id);
+    await delay(created ? CREATED_TAB_SETTLE_MS : EXISTING_TAB_SETTLE_MS);
 
     console.log("[BG] Enviando a tab:", tab.id);
     await browser.tabs.sendMessage(tab.id, {

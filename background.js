@@ -76,6 +76,16 @@ async function ensureLocaleReady() {
 let scheduledMessages = {};
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000;
+const ALARM_PREFIX = "waScheduler::";
+const WHATSAPP_URL = "https://web.whatsapp.com/";
+const CREATED_TAB_SETTLE_MS = 4000;
+const EXISTING_TAB_SETTLE_MS = 1500;
+
+let readyTabs = new Set();
+const readyWaiters = new Map();
+let pendingCloseTabs = new Map();
+
+const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
 // -------------------------
 // Load from storage
@@ -107,15 +117,32 @@ function saveMessages() {
 function reschedulePendingMessages() {
     const now = Date.now();
     Object.values(scheduledMessages).forEach((msg) => {
-        if (msg.status === "scheduled" && msg.sendAt > now) {
-            try {
-                browser.alarms.create(msg.id, { when: msg.sendAt });
-                console.log("[BG] Replanificada alarma:", msg.id);
-            } catch (e) {
-                console.error("[BG] Error replanificando:", e);
-            }
+        if (msg.status !== "scheduled") return;
+
+        const alarmName = buildAlarmName(msg.id);
+        let when = msg.sendAt;
+        if (msg.sendAt <= now) {
+            // If overdue, try again in a few seconds
+            when = Date.now() + 5000;
+        }
+
+        try {
+            browser.alarms.create(alarmName, { when });
+            console.log("[BG] Replanificada alarma:", alarmName, "->", new Date(when).toLocaleString());
+        } catch (e) {
+            console.error("[BG] Error replanificando:", e);
         }
     });
+}
+
+function buildAlarmName(id) {
+    return `${ALARM_PREFIX}${id}`;
+}
+
+function parseAlarmName(name = "") {
+    if (name.startsWith(ALARM_PREFIX)) return name.slice(ALARM_PREFIX.length);
+    // Legacy names without prefix
+    return scheduledMessages[name] ? name : null;
 }
 
 // -------------------------
@@ -124,6 +151,12 @@ function reschedulePendingMessages() {
 
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log("[BG] Mensaje recibido:", message.type);
+
+    if (message.type === "WA_READY" && sender?.tab?.id) {
+        markTabReady(sender.tab.id);
+        sendResponse && sendResponse({ ok: true });
+        return false;
+    }
 
     // SCHEDULE_MESSAGE: schedule a new message
     if (message.type === "SCHEDULE_MESSAGE") {
@@ -152,7 +185,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
             saveMessages();
 
             try {
-                browser.alarms.create(id, { when });
+                browser.alarms.create(buildAlarmName(id), { when });
                 console.log("[BG] Programado:", id, "a las", new Date(when).toLocaleString());
             } catch (e) {
                 console.error("[BG] Error creando alarma:", e);
@@ -193,7 +226,15 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
             msg.status = message.ok ? "sent" : "failed";
             msg.deliveredAt = Date.now();
             msg.lastError = message.error || null;
-            
+
+            const closeTabId = pendingCloseTabs.get(message.id);
+            if (message.ok && closeTabId) {
+                setTimeout(() => {
+                    browser.tabs.remove(closeTabId).catch(() => {});
+                }, 8000);
+                pendingCloseTabs.delete(message.id);
+            }
+
             if (message.ok) {
                 console.log("[BG] ✓ Mensaje entregado:", message.id);
             } else {
@@ -212,7 +253,8 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const msg = scheduledMessages[message.id];
         if (msg && msg.status === "scheduled") {
             try {
-                browser.alarms.clear(message.id);
+                browser.alarms.clear(buildAlarmName(message.id));
+                browser.alarms.clear(message.id); // Legacy name
                 delete scheduledMessages[message.id];
                 saveMessages();
                 console.log("[BG] ✓ Mensaje cancelado:", message.id);
@@ -241,10 +283,11 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 if (message.delayMs) {
                     msg.delayMs = message.delayMs;
                     msg.sendAt = Date.now() + message.delayMs;
-                    
+
                     // Update alarm
-                    browser.alarms.clear(message.id);
-                    browser.alarms.create(message.id, { when: msg.sendAt });
+                    browser.alarms.clear(buildAlarmName(message.id));
+                    browser.alarms.clear(message.id); // Legacy name
+                    browser.alarms.create(buildAlarmName(message.id), { when: msg.sendAt });
                     
                     console.log("[BG] ✏️ Alarma actualizada:", message.id, "de", new Date(oldSendAt).toLocaleString(), "a", new Date(msg.sendAt).toLocaleString());
                 }
@@ -273,7 +316,9 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // -------------------------
 
 browser.alarms.onAlarm.addListener(async (alarm) => {
-    const id = alarm.name;
+    const id = parseAlarmName(alarm.name);
+    if (!id) return;
+
     const msg = scheduledMessages[id];
 
     if (!msg) {
@@ -292,50 +337,123 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
 
     console.log("[BG] ⏱️ Alarma disparada:", id);
 
-    let tabs;
     try {
-        tabs = await browser.tabs.query({ url: "*://web.whatsapp.com/*" });
-    } catch (e) {
-        msg.status = "failed";
-        msg.lastError = t("errorFindTab", [e]);
-        await saveMessages();
-        console.error("[BG] Error en query tabs:", e);
-        return;
-    }
-
-    if (!tabs || tabs.length === 0) {
-        msg.status = "failed";
-        msg.lastError = t("errorNoWhatsAppTab");
-        await saveMessages();
-        console.warn("[BG]", msg.lastError);
-        return;
-    }
-
-    const tab = tabs[0];
-    console.log("[BG] Enviando a tab:", tab.id);
-
-    try {
-        await browser.tabs.sendMessage(tab.id, {
-            type: "SEND_SCHEDULED",
-            id,
-            text: msg.text,
-            chatTitle: msg.chatTitle
-        });
-
-        console.log("[BG] Mensaje enviado al content-script");
+        await ensureWhatsAppTabAndSend(msg);
     } catch (err) {
         msg.status = "failed";
         msg.lastError = t("errorContentScriptCommunication", [String(err)]);
         await saveMessages();
-        console.error("[BG] Error:", err);
+        console.error("[BG] Error en envío programado:", err);
     }
 });
+
+async function ensureWhatsAppTabAndSend(msg) {
+    const { tab, created } = await ensureWhatsAppTab();
+
+    await waitForWhatsAppReady(tab.id);
+    await delay(created ? CREATED_TAB_SETTLE_MS : EXISTING_TAB_SETTLE_MS);
+
+    console.log("[BG] Enviando a tab:", tab.id);
+    await browser.tabs.sendMessage(tab.id, {
+        type: "SEND_SCHEDULED",
+        id: msg.id,
+        text: msg.text,
+        chatTitle: msg.chatTitle
+    });
+
+    console.log("[BG] Mensaje enviado al content-script");
+
+    if (created) {
+        pendingCloseTabs.set(msg.id, tab.id);
+    }
+}
+
+async function ensureWhatsAppTab() {
+    let tabs = [];
+    try {
+        tabs = await browser.tabs.query({ url: "*://web.whatsapp.com/*" });
+    } catch (e) {
+        console.error("[BG] Error en query tabs:", e);
+        throw e;
+    }
+
+    if (tabs && tabs.length > 0) {
+        return { tab: tabs[0], created: false };
+    }
+
+    const createdTab = await browser.tabs.create({ url: WHATSAPP_URL, active: false });
+    await waitForTabComplete(createdTab.id);
+    return { tab: createdTab, created: true };
+}
+
+function waitForTabComplete(tabId) {
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            browser.tabs.onUpdated.removeListener(listener);
+            reject(new Error("Timeout esperando tab"));
+        }, 30000);
+
+        const listener = (id, changeInfo) => {
+            if (id === tabId && changeInfo.status === "complete") {
+                clearTimeout(timeout);
+                browser.tabs.onUpdated.removeListener(listener);
+                resolve();
+            }
+        };
+
+        browser.tabs.onUpdated.addListener(listener);
+    });
+}
+
+function waitForWhatsAppReady(tabId) {
+    if (readyTabs.has(tabId)) return Promise.resolve();
+
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            removeWaiter(tabId, resolver);
+            reject(new Error("Timeout esperando WhatsApp"));
+        }, 30000);
+
+        const resolver = (ok = true) => {
+            clearTimeout(timer);
+            ok ? resolve() : reject(new Error("WhatsApp tab cerrada"));
+        };
+
+        const waiters = readyWaiters.get(tabId) || [];
+        waiters.push(resolver);
+        readyWaiters.set(tabId, waiters);
+    });
+}
+
+function markTabReady(tabId) {
+    readyTabs.add(tabId);
+    const waiters = readyWaiters.get(tabId) || [];
+    waiters.forEach((fn) => fn(true));
+    readyWaiters.delete(tabId);
+}
+
+function removeWaiter(tabId, resolver) {
+    const waiters = readyWaiters.get(tabId) || [];
+    const next = waiters.filter((fn) => fn !== resolver);
+    if (next.length) {
+        readyWaiters.set(tabId, next);
+    } else {
+        readyWaiters.delete(tabId);
+    }
+}
 
 // -------------------------
 // Initialize on load
 // -------------------------
 
 loadMessages();
+
+browser.tabs.onRemoved.addListener((tabId) => {
+    readyTabs.delete(tabId);
+    const waiters = readyWaiters.get(tabId) || [];
+    waiters.forEach((fn) => fn(false));
+    readyWaiters.delete(tabId);
+});
 
 // -------------------------
 // Cleanup old messages (optional)

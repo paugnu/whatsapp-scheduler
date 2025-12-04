@@ -228,6 +228,19 @@ function getActiveChatTitle() {
     return null;
 }
 
+function getActiveChatAvatarKey() {
+    const header = document.querySelector("#main header");
+    if (!header) return null;
+
+    const img = header.querySelector("img");
+    if (!img) return null;
+
+    let src = img.getAttribute("src") || img.style.backgroundImage || "";
+    src = src.replace(/^url\(["']?(.+?)["']?\)$/, "$1");
+
+    return src || null;
+}
+
 // -------------------------
 // Normalize and compare chat names
 // -------------------------
@@ -275,7 +288,26 @@ function clearSearchBox(searchBox) {
     document.execCommand("delete", false, null);
 }
 
-function openChatByTitle(title) {
+function getRowAvatarKey(row) {
+    if (!row) return null;
+
+    const img = row.querySelector("img") || row.querySelector('[style*="background-image"]');
+    if (!img) return null;
+
+    let src = img.getAttribute("src") || img.style.backgroundImage || "";
+    src = src.replace(/^url\(["']?(.+?)["']?\)$/, "$1");
+
+    return src || null;
+}
+
+function clickRow(row) {
+    if (!row) return false;
+    row.scrollIntoView({ block: "center", behavior: "instant" });
+    superClick(row);
+    return true;
+}
+
+function openChatByTitle(title, avatarKey) {
     if (!title) return { found: false };
 
     const sidePane = document.getElementById("pane-side") || document.body;
@@ -301,22 +333,33 @@ function openChatByTitle(title) {
     const bestScore = matches[0].score;
     const bestMatches = matches.filter((m) => m.score === bestScore);
 
-    if (bestMatches.length > 1) {
-        showToast(t("errorChatAmbiguous", [title]), "warning", 6000);
-        return { found: false, reason: "ambiguous" };
+    if (bestMatches.length === 1) {
+        const match = bestMatches[0];
+        console.log(`[WA Scheduler] Chat encontrado: "${match.text}". Abriendo...`);
+        match.row.scrollIntoView({ block: "center", behavior: "instant" });
+        superClick(match.span);
+        superClick(match.row);
+        return { found: true };
     }
 
-    const match = bestMatches[0];
-    console.log(`[WA Scheduler] Chat encontrado: "${match.text}". Abriendo...`);
-    match.row.scrollIntoView({ block: "center", behavior: "instant" });
+    if (avatarKey) {
+        const avatarMatches = bestMatches.filter((match) => {
+            const rowAvatar = getRowAvatarKey(match.row);
+            return rowAvatar && rowAvatar === avatarKey;
+        });
 
-    superClick(match.span);
-    superClick(match.row);
+        if (avatarMatches.length === 1) {
+            const match = avatarMatches[0];
+            console.log(`[WA Scheduler] Chat encontrado por avatar: "${match.text}".`);
+            return clickRow(match.row) ? { found: true } : { found: false };
+        }
+    }
 
-    return { found: true };
+    showToast(t("errorChatAmbiguous", [title]), "warning", 6000);
+    return { found: false, reason: "ambiguous" };
 }
 
-async function searchAndOpenChat(title) {
+async function searchAndOpenChat(title, avatarKey) {
     console.log("[WA Scheduler] Chat oculto, usando buscador:", title);
 
     let searchInput = document.querySelector('div[contenteditable="true"][data-tab="3"]');
@@ -332,7 +375,7 @@ async function searchAndOpenChat(title) {
 
     if (!searchInput) {
         console.error("[WA Scheduler] No se encontró buscador");
-        return false;
+        return { found: false };
     }
 
     searchInput.focus();
@@ -342,7 +385,7 @@ async function searchAndOpenChat(title) {
 
     await delay(1800);
 
-    const result = openChatByTitle(title);
+    const result = openChatByTitle(title, avatarKey);
 
     if (result.found) {
         await delay(1500);
@@ -467,7 +510,7 @@ function sendMessageInActiveChat(text) {
 // Send to the scheduled chat
 // -------------------------
 
-async function sendToScheduledChat(id, text, chatTitle) {
+async function sendToScheduledChat(id, text, chatTitle, avatarKey) {
     await ensureLocaleReady();
 
     console.log("--- Procesando:", chatTitle);
@@ -483,7 +526,10 @@ async function sendToScheduledChat(id, text, chatTitle) {
     }
 
     const current = getActiveChatTitle();
-    if (current && namesMatch(chatTitle, current)) {
+    const currentAvatar = getActiveChatAvatarKey();
+    const avatarMatches = avatarKey ? currentAvatar && currentAvatar === avatarKey : true;
+
+    if (current && namesMatch(chatTitle, current) && avatarMatches) {
         console.log("Chat correcto ya abierto.");
         try {
             sendMessageInActiveChat(text);
@@ -494,9 +540,9 @@ async function sendToScheduledChat(id, text, chatTitle) {
         return;
     }
 
-    let openResult = openChatByTitle(chatTitle);
+    let openResult = openChatByTitle(chatTitle, avatarKey);
     if (!openResult.found) {
-        openResult = await searchAndOpenChat(chatTitle);
+        openResult = await searchAndOpenChat(chatTitle, avatarKey);
     }
 
     if (!openResult.found) {
@@ -1150,13 +1196,15 @@ async function createSchedulerUI() {
 
         const delayMs = totalMins * 60 * 1000;
         const chatTitle = getActiveChatTitle();
+        const avatarKey = getActiveChatAvatarKey();
 
         browser.runtime.sendMessage(
             {
                 type: "SCHEDULE_MESSAGE",
                 text,
                 delayMs,
-                chatTitle
+                chatTitle,
+                avatarKey
             },
             (resp) => {
                 if (resp && resp.ok) {
@@ -1247,8 +1295,8 @@ document.addEventListener("keydown", (e) => {
 browser.runtime.onMessage.addListener((msg) => {
     if (msg.type === "SEND_SCHEDULED") {
         console.log("[WA Scheduler] SEND_SCHEDULED recibido:", msg);
-        const { id, text, chatTitle } = msg;
-        sendToScheduledChat(id, text, chatTitle).catch((err) =>
+        const { id, text, chatTitle, avatarKey } = msg;
+        sendToScheduledChat(id, text, chatTitle, avatarKey).catch((err) =>
             console.error("[WA Scheduler] Error en envío programado:", err)
         );
     }

@@ -172,6 +172,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 id,
                 text: message.text,
                 chatTitle: message.chatTitle || null,
+                avatarKey: message.avatarKey || null,
                 createdAt: Date.now(),
                 sendAt: when,
                 delayMs: message.delayMs,
@@ -358,7 +359,8 @@ async function ensureWhatsAppTabAndSend(msg) {
         type: "SEND_SCHEDULED",
         id: msg.id,
         text: msg.text,
-        chatTitle: msg.chatTitle
+        chatTitle: msg.chatTitle,
+        avatarKey: msg.avatarKey
     });
 
     console.log("[BG] Mensaje enviado al content-script");

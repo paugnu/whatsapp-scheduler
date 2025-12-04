@@ -41,6 +41,15 @@
   "labelMinutes": {
     "message": "Minuten"
   },
+  "labelScheduleAfter": {
+    "message": "Verzenden na"
+  },
+  "labelScheduleAt": {
+    "message": "Verzenden op datum/tijd"
+  },
+  "labelScheduleAtField": {
+    "message": "Datum en tijd"
+  },
   "buttonSchedule": {
     "message": "✓ Plannen"
   },

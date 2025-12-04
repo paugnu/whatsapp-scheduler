@@ -41,6 +41,15 @@
   "labelMinutes": {
     "message": "मिनट"
   },
+  "labelScheduleAfter": {
+    "message": "के बाद भेजें"
+  },
+  "labelScheduleAt": {
+    "message": "तिथि/समय पर भेजें"
+  },
+  "labelScheduleAtField": {
+    "message": "तिथि और समय"
+  },
   "buttonSchedule": {
     "message": "✓ शेड्यूल"
   },

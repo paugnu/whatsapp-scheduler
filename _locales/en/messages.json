@@ -41,6 +41,15 @@
   "labelMinutes": {
     "message": "Minutes"
   },
+  "labelScheduleAfter": {
+    "message": "Send after"
+  },
+  "labelScheduleAt": {
+    "message": "Send at date/time"
+  },
+  "labelScheduleAtField": {
+    "message": "Date and time"
+  },
   "buttonSchedule": {
     "message": "✓ Schedule"
   },

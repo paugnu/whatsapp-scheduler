@@ -161,24 +161,30 @@ function attachScheduleButtonToComposer() {
         document.querySelector('button[aria-label="Send"]') ||
         document.querySelector('[data-icon="wds-ic-send-filled"]')?.closest('button');
 
-    if (!sendBtn) return;
-
-    const wrapper = sendBtn.closest('div');
-    if (!wrapper) return;
-
-    const existing = document.getElementById("wa-inline-schedule-btn");
-    if (existing) {
-        if (existing.closest('div') === wrapper) return;
-        existing.remove();
+    if (!sendBtn) {
+        console.log("[WA Scheduler] Send button not found for inline schedule");
+        return;
     }
+
+    if (document.getElementById("wa-inline-schedule-btn")) {
+        return;
+    }
+
+    const wrapper = sendBtn.closest("div");
+    if (!wrapper) return;
 
     const scheduleBtn = document.createElement("button");
     scheduleBtn.id = "wa-inline-schedule-btn";
+    scheduleBtn.className = sendBtn.className;
     scheduleBtn.type = "button";
     scheduleBtn.setAttribute("aria-label", "Programar mensaje");
     scheduleBtn.setAttribute("data-tab", "12");
-    scheduleBtn.className = sendBtn.className;
-    scheduleBtn.innerHTML = '<span class="wa-schedule-icon">📅</span>';
+    scheduleBtn.innerHTML = `
+        <div class="html-div">
+            <span class="wa-schedule-icon">📅</span>
+        </div>
+    `;
+    scheduleBtn.style.marginRight = "4px";
 
     scheduleBtn.addEventListener("click", (e) => {
         e.preventDefault();
@@ -186,11 +192,9 @@ function attachScheduleButtonToComposer() {
         createSchedulerUI();
     });
 
-    scheduleBtn.style.display = sendBtn.style.display;
-    scheduleBtn.style.alignItems = sendBtn.style.alignItems;
-    scheduleBtn.style.justifyContent = sendBtn.style.justifyContent;
-
     wrapper.insertBefore(scheduleBtn, sendBtn);
+
+    console.log("[WA Scheduler] Inline schedule button attached");
 }
 
 // Find the active chat composer without using cache
@@ -512,7 +516,10 @@ function showToast(msg, type = "info", duration = 3000) {
 
 // Start synchronization for the active chat
 startChatObserver();
-setTimeout(() => attachScheduleButtonToComposer(), 2000);
+setTimeout(() => {
+    observeComposerForButton();
+    attachScheduleButtonToComposer();
+}, 3000);
 
 // -------------------------
 // Write and send a message
@@ -630,8 +637,9 @@ function startChatObserver() {
             const composer = findActiveComposer();
             if (composer) {
                 setLastTargetsFromElement(composer);
-                attachScheduleButtonToComposer();
             }
+
+            setTimeout(attachScheduleButtonToComposer, 300);
         }
     };
 
@@ -643,7 +651,25 @@ function startChatObserver() {
     }
 
     // Periodic fallback in case the observer misses changes
-    setInterval(updateTargetsForChat, 1500);
+    setInterval(() => {
+        updateTargetsForChat();
+        attachScheduleButtonToComposer();
+    }, 1500);
+}
+
+function observeComposerForButton() {
+    const composeBox =
+        document.querySelector('[data-testid="conversation-compose-box"]') ||
+        document.querySelector("footer")?.parentElement;
+
+    if (!composeBox) return;
+
+    const mo = new MutationObserver(() => {
+        attachScheduleButtonToComposer();
+    });
+
+    mo.observe(composeBox, { childList: true, subtree: true });
+    console.log("[WA Scheduler] Composer observer attached");
 }
 
 // -------------------------

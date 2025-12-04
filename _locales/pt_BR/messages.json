@@ -155,6 +155,9 @@
   "toastMessageUpdated": {
     "message": "✓ Mensagem atualizada"
   },
+  "labelDeliveredAt": {
+    "message": "Delivered at"
+  },
   "listSubtitle": {
     "message": "Histórico de envios"
   }

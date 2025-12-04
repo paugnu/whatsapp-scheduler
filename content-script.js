@@ -964,8 +964,12 @@ async function renderListPanel(host) {
                         <div style="font-weight: 700; font-size: 13px; margin-bottom: 4px;">${textShort}</div>
                         <div style="font-size: 11px; color: rgba(255,255,255,0.65); display: flex; gap: 8px; flex-wrap: wrap;">
                             <span>⏰ ${when}</span>
-                            ${delivered ? `<span>✅ ${t("labelDeliveredAt", [delivered])}</span>` : ""}
                         </div>
+                        ${delivered ? `
+                            <div style="font-size: 10px; color: #00a884; opacity: 0.85;">
+                                ✓ ${t("labelDeliveredAt")} ${delivered}
+                            </div>
+                        ` : ""}
                         <div style="margin-top: 6px; font-size: 11px; display: flex; gap: 10px; align-items: center;">
                             <span style="padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.08); color: ${statusColor}; font-weight: 700;">${statusLabel}</span>
                             ${m.chatTitle ? `<span style="color: rgba(255,255,255,0.7);">💬 ${m.chatTitle}</span>` : ""}

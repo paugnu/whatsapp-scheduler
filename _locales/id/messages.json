@@ -155,6 +155,9 @@
   "toastMessageUpdated": {
     "message": "✓ Pesan diperbarui"
   },
+  "labelDeliveredAt": {
+    "message": "Delivered at"
+  },
   "listSubtitle": {
     "message": "Riwayat pengiriman"
   }

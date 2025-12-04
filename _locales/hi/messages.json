@@ -155,6 +155,9 @@
   "toastMessageUpdated": {
     "message": "✓ संदेश अपडेट किया गया"
   },
+  "labelDeliveredAt": {
+    "message": "Delivered at"
+  },
   "listSubtitle": {
     "message": "डिलीवरी इतिहास"
   }

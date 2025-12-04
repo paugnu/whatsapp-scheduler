@@ -155,6 +155,9 @@
   "toastMessageUpdated": {
     "message": "✓ Messaggio aggiornato"
   },
+  "labelDeliveredAt": {
+    "message": "Delivered at"
+  },
   "listSubtitle": {
     "message": "Cronologia invii"
   }

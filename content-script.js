@@ -1112,6 +1112,16 @@ async function createSchedulerUI() {
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div style="grid-column: span 2; display: flex; gap: 10px; align-items: center;">
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                            <input id="wa-mode-relative" type="radio" name="wa-mode" value="relative" checked style="width: 14px; height: 14px;">
+                            <span>${t("labelScheduleAfter") || "Enviar después"}</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                            <input id="wa-mode-datetime" type="radio" name="wa-mode" value="datetime" style="width: 14px; height: 14px;">
+                            <span>${t("labelScheduleAt") || "Enviar en fecha/hora"}</span>
+                        </label>
+                    </div>
                     <div>
                         <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${t("labelHours")}</label>
                         <input id="wa-hours" type="number" min="0" max="999" value="0" style="width: 100%; padding: 8px 10px; border-radius: 6px;">
@@ -1119,6 +1129,10 @@ async function createSchedulerUI() {
                     <div>
                         <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${t("labelMinutes")}</label>
                         <input id="wa-mins" type="number" min="0" max="59" value="0" style="width: 100%; padding: 8px 10px; border-radius: 6px;">
+                    </div>
+                    <div style="grid-column: span 2;">
+                        <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${t("labelScheduleAt") || "Fecha y hora"}</label>
+                        <input id="wa-datetime" type="datetime-local" style="width: 100%; padding: 8px 10px; border-radius: 6px;">
                     </div>
                 </div>
 
@@ -1173,10 +1187,28 @@ async function createSchedulerUI() {
     document.getElementById("wa-close").onclick = () => panel.remove();
     document.getElementById("wa-list").onclick = () => renderListPanel();
 
+    const modeRelative = document.getElementById("wa-mode-relative");
+    const modeDatetime = document.getElementById("wa-mode-datetime");
+    const hoursInput = document.getElementById("wa-hours");
+    const minsInput = document.getElementById("wa-mins");
+    const datetimeInput = document.getElementById("wa-datetime");
+
+    function updateModeUI() {
+        const isRelative = modeRelative.checked;
+        hoursInput.disabled = !isRelative;
+        minsInput.disabled = !isRelative;
+        datetimeInput.disabled = isRelative;
+        datetimeInput.style.opacity = isRelative ? 0.5 : 1;
+    }
+
+    modeRelative.addEventListener("change", updateModeUI);
+    modeDatetime.addEventListener("change", updateModeUI);
+    updateModeUI();
+
     document.getElementById("wa-schedule").onclick = () => {
         const text = document.getElementById("wa-msg").value.trim();
-        const hours = parseInt(document.getElementById("wa-hours").value || "0", 10);
-        const mins = parseInt(document.getElementById("wa-mins").value || "0", 10);
+        const hours = parseInt(hoursInput.value || "0", 10);
+        const mins = parseInt(minsInput.value || "0", 10);
 
         if (!text) {
             showToast(t("toastWriteMessage"), "warning");
@@ -1188,13 +1220,33 @@ async function createSchedulerUI() {
             return;
         }
 
-        const totalMins = hours * 60 + mins;
-        if (totalMins <= 0) {
-            showToast(t("toastNeedTime"), "warning");
-            return;
+        const isRelativeMode = modeRelative.checked;
+        let delayMs = 0;
+        let totalMins = 0;
+
+        if (isRelativeMode) {
+            // Relative delay branch (hours/minutes)
+            totalMins = hours * 60 + mins;
+            if (totalMins <= 0) {
+                showToast(t("toastNeedTime"), "warning");
+                return;
+            }
+
+            delayMs = totalMins * 60 * 1000;
+        } else {
+            // Absolute datetime branch
+            const dtValue = datetimeInput.value;
+            const sendAt = dtValue ? new Date(dtValue).getTime() : NaN;
+            delayMs = sendAt - Date.now();
+
+            if (!dtValue || isNaN(sendAt) || delayMs <= 0) {
+                showToast("Selecciona una fecha/hora futura", "warning");
+                return;
+            }
+
+            totalMins = Math.ceil(delayMs / (60 * 1000));
         }
 
-        const delayMs = totalMins * 60 * 1000;
         const chatTitle = getActiveChatTitle();
         const avatarKey = getActiveChatAvatarKey();
 
@@ -1210,8 +1262,9 @@ async function createSchedulerUI() {
                 if (resp && resp.ok) {
                     showToast(t("toastScheduledMinutes", [totalMins]), "success");
                     msgInput.value = "";
-                    document.getElementById("wa-hours").value = "0";
-                    document.getElementById("wa-mins").value = "0";
+                    hoursInput.value = "0";
+                    minsInput.value = "0";
+                    datetimeInput.value = "";
                     charCount.textContent = "0";
                     setTimeout(() => panel.remove(), 500);
                 } else {

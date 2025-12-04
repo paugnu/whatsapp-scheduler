@@ -419,7 +419,7 @@ function showToast(msg, type = "info", duration = 3000) {
     toast.style.cssText = `
         position: fixed;
         bottom: 100px;
-        right: 20px;
+        right: 80px;
         background: ${bgColor};
         color: white;
         padding: 12px 16px;
@@ -1034,7 +1034,7 @@ async function createSchedulerUI() {
     panel.style.cssText = `
         position: fixed;
         bottom: 84px;
-        right: 20px;
+        right: 80px;
         z-index: 99999;
         color: #e9edef;
         font-size: 12px;
@@ -1293,11 +1293,11 @@ async function createFloatingButton() {
     btn.title = t("buttonTooltip");
     btn.style.cssText = `
         position: fixed;
-        bottom: 20px;
-        right: 20px;
+        bottom: 18px;
+        right: 70px;
         z-index: 99998;
-        width: 50px;
-        height: 50px;
+        width: 40px;
+        height: 40px;
         border-radius: 25px;
         border: none;
         background: #25D366;

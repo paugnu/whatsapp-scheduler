@@ -585,6 +585,10 @@ function startChatObserver() {
         const current = getActiveChatTitle();
         if (current && current !== lastChatTitle) {
             lastChatTitle = current;
+
+            const panel = document.getElementById("wa-scheduler-panel");
+            if (panel) panel.remove();
+
             lastInput = null;
             lastSendButton = null;
 
@@ -592,6 +596,8 @@ function startChatObserver() {
             if (composer) {
                 setLastTargetsFromElement(composer);
             }
+
+            setTimeout(attachScheduleButtonToComposer, 300);
         }
     };
 
@@ -1314,6 +1320,10 @@ async function createSchedulerUI() {
 // -------------------------
 // Floating button
 // -------------------------
+
+function attachScheduleButtonToComposer() {
+    createFloatingButton();
+}
 
 async function createFloatingButton() {
     await ensureLocaleReady();

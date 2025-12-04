@@ -155,6 +155,44 @@ let lastSendButton = null;
 let lastChatTitle = null;
 let chatCheckTimeout = null;
 
+function attachScheduleButtonToComposer() {
+    const sendBtn =
+        document.querySelector('button[aria-label="Enviar"]') ||
+        document.querySelector('button[aria-label="Send"]') ||
+        document.querySelector('[data-icon="wds-ic-send-filled"]')?.closest('button');
+
+    if (!sendBtn) return;
+
+    const wrapper = sendBtn.closest('div');
+    if (!wrapper) return;
+
+    const existing = document.getElementById("wa-inline-schedule-btn");
+    if (existing) {
+        if (existing.closest('div') === wrapper) return;
+        existing.remove();
+    }
+
+    const scheduleBtn = document.createElement("button");
+    scheduleBtn.id = "wa-inline-schedule-btn";
+    scheduleBtn.type = "button";
+    scheduleBtn.setAttribute("aria-label", "Programar mensaje");
+    scheduleBtn.setAttribute("data-tab", "12");
+    scheduleBtn.className = sendBtn.className;
+    scheduleBtn.innerHTML = '<span class="wa-schedule-icon">📅</span>';
+
+    scheduleBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        createSchedulerUI();
+    });
+
+    scheduleBtn.style.display = sendBtn.style.display;
+    scheduleBtn.style.alignItems = sendBtn.style.alignItems;
+    scheduleBtn.style.justifyContent = sendBtn.style.justifyContent;
+
+    wrapper.insertBefore(scheduleBtn, sendBtn);
+}
+
 // Find the active chat composer without using cache
 function findActiveComposer() {
     return (
@@ -183,6 +221,7 @@ function setLastTargetsFromElement(el) {
         null;
 
     console.log("[WA Scheduler] lastInput actualizado, lastSendButton:", !!lastSendButton);
+    attachScheduleButtonToComposer();
 }
 
 // Detect clicks/focus in the editor (with throttling)
@@ -473,6 +512,7 @@ function showToast(msg, type = "info", duration = 3000) {
 
 // Start synchronization for the active chat
 startChatObserver();
+setTimeout(() => attachScheduleButtonToComposer(), 2000);
 
 // -------------------------
 // Write and send a message
@@ -590,6 +630,7 @@ function startChatObserver() {
             const composer = findActiveComposer();
             if (composer) {
                 setLastTargetsFromElement(composer);
+                attachScheduleButtonToComposer();
             }
         }
     };
@@ -1277,58 +1318,6 @@ async function createSchedulerUI() {
     // Focus on the text field
     setTimeout(() => msgInput.focus(), 100);
 }
-
-// -------------------------
-// Floating button
-// -------------------------
-
-async function createFloatingButton() {
-    await ensureLocaleReady();
-
-    if (document.getElementById("wa-scheduler-button")) return;
-
-    const btn = document.createElement("button");
-    btn.id = "wa-scheduler-button";
-    btn.textContent = "📅";
-    btn.title = t("buttonTooltip");
-    btn.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        z-index: 99998;
-        width: 50px;
-        height: 50px;
-        border-radius: 25px;
-        border: none;
-        background: #25D366;
-        color: black;
-        font-size: 24px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        transition: all 0.2s;
-        font-family: inherit;
-    `;
-
-    btn.onmouseover = () => {
-        btn.style.transform = "scale(1.1)";
-        btn.style.boxShadow = "0 6px 20px rgba(37, 211, 102, 0.4)";
-    };
-
-    btn.onmouseout = () => {
-        btn.style.transform = "scale(1)";
-        btn.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.3)";
-    };
-
-    btn.onclick = createSchedulerUI;
-
-    document.body.appendChild(btn);
-    console.log("[WA Scheduler] Botón flotante creado");
-}
-
-setTimeout(createFloatingButton, 3000);
 
 // -------------------------
 // Keyboard shortcuts

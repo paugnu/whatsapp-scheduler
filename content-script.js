@@ -1289,7 +1289,64 @@ async function createFloatingButton() {
 
     const btn = document.createElement("button");
     btn.id = "wa-scheduler-button";
-    btn.textContent = "📅";
+    btn.innerHTML = `
+        <div class="html-div">
+            <svg
+                class="wa-schedule-icon"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                aria-hidden="true"
+            >
+                <rect
+                    x="3.5"
+                    y="4.5"
+                    width="17"
+                    height="16"
+                    rx="2.5"
+                    ry="2.5"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                />
+                <line
+                    x1="3.5"
+                    y1="8.5"
+                    x2="20.5"
+                    y2="8.5"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                />
+                <line
+                    x1="9"
+                    y1="3"
+                    x2="9"
+                    y2="6.5"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                />
+                <line
+                    x1="15"
+                    y1="3"
+                    x2="15"
+                    y2="6.5"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                />
+                <polyline
+                    points="9 13 11.3 15.3 15.2 11.8"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                />
+            </svg>
+        </div>
+    `;
     btn.title = t("buttonTooltip");
     btn.style.cssText = `
         position: fixed;

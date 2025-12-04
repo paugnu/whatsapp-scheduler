@@ -41,6 +41,15 @@
   "labelMinutes": {
     "message": "Минуты"
   },
+  "labelScheduleAfter": {
+    "message": "Отправить через"
+  },
+  "labelScheduleAt": {
+    "message": "Отправить в дату/время"
+  },
+  "labelScheduleAtField": {
+    "message": "Дата и время"
+  },
   "buttonSchedule": {
     "message": "✓ Запланировать"
   },

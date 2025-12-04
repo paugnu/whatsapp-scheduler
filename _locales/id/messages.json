@@ -41,6 +41,15 @@
   "labelMinutes": {
     "message": "Menit"
   },
+  "labelScheduleAfter": {
+    "message": "Kirim setelah"
+  },
+  "labelScheduleAt": {
+    "message": "Kirim pada tanggal/waktu"
+  },
+  "labelScheduleAtField": {
+    "message": "Tanggal dan waktu"
+  },
   "buttonSchedule": {
     "message": "✓ Jadwalkan"
   },

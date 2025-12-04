@@ -1027,7 +1027,15 @@ async function renderListPanel() {
 async function createSchedulerUI() {
     await ensureLocaleReady();
 
-    if (document.getElementById("wa-scheduler-panel")) return;
+    const existing = document.getElementById("wa-scheduler-panel");
+    if (existing) {
+        existing.remove();
+        return;
+    }
+
+    const labelAfter = t("labelScheduleAfter") || "Enviar después de";
+    const labelAt = t("labelScheduleAt") || "Enviar en fecha/hora";
+    const labelAtField = t("labelScheduleAtField") || "Fecha y hora";
 
     const panel = document.createElement("div");
     panel.id = "wa-scheduler-panel";
@@ -1115,11 +1123,11 @@ async function createSchedulerUI() {
                     <div style="grid-column: span 2; display: flex; gap: 10px; align-items: center;">
                         <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
                             <input id="wa-mode-relative" type="radio" name="wa-mode" value="relative" checked style="width: 14px; height: 14px;">
-                            <span>${t("labelScheduleAfter") || "Enviar después"}</span>
+                            <span>${labelAfter}</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
                             <input id="wa-mode-datetime" type="radio" name="wa-mode" value="datetime" style="width: 14px; height: 14px;">
-                            <span>${t("labelScheduleAt") || "Enviar en fecha/hora"}</span>
+                            <span>${labelAt}</span>
                         </label>
                     </div>
                     <div>
@@ -1131,7 +1139,7 @@ async function createSchedulerUI() {
                         <input id="wa-mins" type="number" min="0" max="59" value="0" style="width: 100%; padding: 8px 10px; border-radius: 6px;">
                     </div>
                     <div style="grid-column: span 2;">
-                        <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${t("labelScheduleAt") || "Fecha y hora"}</label>
+                        <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${labelAtField}</label>
                         <input id="wa-datetime" type="datetime-local" style="width: 100%; padding: 8px 10px; border-radius: 6px;">
                     </div>
                 </div>
@@ -1289,7 +1297,64 @@ async function createFloatingButton() {
 
     const btn = document.createElement("button");
     btn.id = "wa-scheduler-button";
-    btn.textContent = "📅";
+    btn.innerHTML = `
+        <div class="html-div">
+            <svg
+                class="wa-schedule-icon"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                aria-hidden="true"
+            >
+                <rect
+                    x="3.5"
+                    y="4.5"
+                    width="17"
+                    height="16"
+                    rx="2.5"
+                    ry="2.5"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                />
+                <line
+                    x1="3.5"
+                    y1="8.5"
+                    x2="20.5"
+                    y2="8.5"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                />
+                <line
+                    x1="9"
+                    y1="3"
+                    x2="9"
+                    y2="6.5"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                />
+                <line
+                    x1="15"
+                    y1="3"
+                    x2="15"
+                    y2="6.5"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                />
+                <polyline
+                    points="9 13 11.3 15.3 15.2 11.8"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                />
+            </svg>
+        </div>
+    `;
     btn.title = t("buttonTooltip");
     btn.style.cssText = `
         position: fixed;

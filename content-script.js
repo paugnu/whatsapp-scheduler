@@ -154,6 +154,7 @@ let lastInput = null;
 let lastSendButton = null;
 let lastChatTitle = null;
 let chatCheckTimeout = null;
+let waSchedulerMode = "schedule"; // "schedule" or "list"
 
 // Find the active chat composer without using cache
 function findActiveComposer() {
@@ -584,6 +585,10 @@ function startChatObserver() {
         const current = getActiveChatTitle();
         if (current && current !== lastChatTitle) {
             lastChatTitle = current;
+
+            const panel = document.getElementById("wa-scheduler-panel");
+            if (panel) panel.remove();
+
             lastInput = null;
             lastSendButton = null;
 
@@ -591,6 +596,8 @@ function startChatObserver() {
             if (composer) {
                 setLastTargetsFromElement(composer);
             }
+
+            setTimeout(attachScheduleButtonToComposer, 300);
         }
     };
 
@@ -804,14 +811,14 @@ async function openEditDialog(msgId, msg) {
                 delayMs: newDelayMs
             },
             (resp) => {
-                if (resp && resp.ok) {
-                    showToast(t("toastMessageUpdated"), "success");
-                    modal.style.animation = "slideOut 0.3s ease-in";
-                    setTimeout(() => {
-                        modal.remove();
-                        document.removeEventListener("keydown", escapeHandler);
-                        renderListPanel();
-                    }, 300);
+                                if (resp && resp.ok) {
+                                    showToast(t("toastMessageUpdated"), "success");
+                                    modal.style.animation = "slideOut 0.3s ease-in";
+                                    setTimeout(() => {
+                                        modal.remove();
+                                        document.removeEventListener("keydown", escapeHandler);
+                                        renderListPanel(host);
+                                    }, 300);
                 } else {
                     showToast(t("toastErrorWithDetail", [resp?.error || t("errorNoResponse")]), "error", 5000);
                 }
@@ -834,52 +841,66 @@ async function openEditDialog(msgId, msg) {
 // -------------------------
 // Enhanced list panel
 
-async function renderListPanel() {
+async function renderListPanel(host) {
     await ensureLocaleReady();
 
-    const existing = document.getElementById("wa-scheduler-list");
-    if (existing) existing.remove();
+    let body = null;
 
-    const panel = document.createElement("div");
-    panel.id = "wa-scheduler-list";
-    panel.style.cssText = `
-        position: fixed;
-        bottom: 80px;
-        right: 320px;
-        z-index: 99999;
-        background: #202c33;
-        color: #e9edef;
-        padding: 12px;
-        border-radius: 8px;
-        font-size: 11px;
-        width: 380px;
-        max-height: 68vh;
-        overflow-y: auto;
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    `;
-
-    panel.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);">
-            <div>
+    if (host) {
+        host.innerHTML = `
+            <div style="margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);">
                 <div style="font-weight: 700; font-size: 13px; margin-bottom: 2px;">${t("listTitle")}</div>
                 <div style="font-size: 11px; color: rgba(241,241,242,0.6);">${t("listSubtitle")}</div>
             </div>
-            <button id="wa-list-close"
-                style="width: 32px; height: 32px; background: transparent; color: #e9edef; border: none; border-radius: 16px; cursor: pointer; font-size: 16px; transition: background 0.15s; display: flex; align-items: center; justify-content: center;"
-                onmouseover="this.style.background='rgba(134,150,160,0.16)'"
-                onmouseout="this.style.background='transparent'">✕</button>
-        </div>
-        <div id="wa-scheduler-list-body" style="max-height: 55vh; overflow-y: auto;">${t("listLoading")}</div>
-    `;
+            <div id="wa-scheduler-list-body" style="max-height: 55vh; overflow-y: auto;">${t("listLoading")}</div>
+        `;
+        body = host.querySelector("#wa-scheduler-list-body");
+    } else {
+        const existing = document.getElementById("wa-scheduler-list");
+        if (existing) existing.remove();
 
-    document.body.appendChild(panel);
+        const panel = document.createElement("div");
+        panel.id = "wa-scheduler-list";
+        panel.style.cssText = `
+            position: fixed;
+            bottom: 80px;
+            right: 320px;
+            z-index: 99999;
+            background: #202c33;
+            color: #e9edef;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            width: 380px;
+            max-height: 68vh;
+            overflow-y: auto;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        `;
 
-    const closeBtn = document.getElementById("wa-list-close");
-    closeBtn.onclick = () => panel.remove();
+        panel.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                <div>
+                    <div style="font-weight: 700; font-size: 13px; margin-bottom: 2px;">${t("listTitle")}</div>
+                    <div style="font-size: 11px; color: rgba(241,241,242,0.6);">${t("listSubtitle")}</div>
+                </div>
+                <button id="wa-list-close"
+                    style="width: 32px; height: 32px; background: transparent; color: #e9edef; border: none; border-radius: 16px; cursor: pointer; font-size: 16px; transition: background 0.15s; display: flex; align-items: center; justify-content: center;"
+                    onmouseover="this.style.background='rgba(134,150,160,0.16)'"
+                    onmouseout="this.style.background='transparent'">✕</button>
+            </div>
+            <div id="wa-scheduler-list-body" style="max-height: 55vh; overflow-y: auto;">${t("listLoading")}</div>
+        `;
 
-    const body = document.getElementById("wa-scheduler-list-body");
+        document.body.appendChild(panel);
+
+        const closeBtn = document.getElementById("wa-list-close");
+        closeBtn.onclick = () => panel.remove();
+        body = document.getElementById("wa-scheduler-list-body");
+    }
+
+    if (!body) return;
 
     browser.runtime.sendMessage({ type: "GET_MESSAGES" }, (resp) => {
         if (!resp || !resp.ok) {
@@ -937,84 +958,71 @@ async function renderListPanel() {
                 failed: t("statusFailed")
             }[m.status] || m.status;
 
-            const canEdit = m.status === "scheduled";
-            const canCancel = m.status === "scheduled";
-
             row.innerHTML = `
-                <div style="display: flex; gap: 10px; align-items: stretch;">
-                    <div style="width: 3px; border-radius: 6px; background: ${statusColor};"></div>
-                    <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: rgba(241,241,242,0.7);">
-                            <span style="color: ${statusColor}; font-weight: 700;">${statusLabel}</span>
-                            <span>${when}</span>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 700; font-size: 13px; margin-bottom: 4px;">${textShort}</div>
+                        <div style="font-size: 11px; color: rgba(255,255,255,0.65); display: flex; gap: 8px; flex-wrap: wrap;">
+                            <span>⏰ ${when}</span>
                         </div>
-                        <div style="font-weight: 700; font-size: 12.5px; color: #e9edef; word-break: break-word;">${m.chatTitle || t("labelNoChat")}</div>
-                        <div style="font-size: 12px; color: rgba(241,241,242,0.7); word-break: break-word; line-height: 1.35;">${textShort}</div>
-                        ${delivered ? `<div style="font-size: 10px; color: #00a884; opacity: 0.85;">✓ ${delivered}</div>` : ""}
-                        ${m.lastError ? `<div style="font-size: 10px; color: #fca5a5;">⚠ ${m.lastError}</div>` : ""}
-                        <div style="display: flex; gap: 8px; margin-top: 6px;">
-                            ${canEdit ? `<button class="wa-list-edit" data-id="${m.id}"
-                                style="padding: 6px 10px; background: transparent; border: 1px solid rgba(134,150,160,0.7); color: #e9edef; border-radius: 6px; font-size: 11px; cursor: pointer; transition: background 0.15s, border-color 0.15s;"
-                                title="${t("buttonEdit")}">
-                                ${t("buttonEdit")}
-                            </button>` : ""}
-                            ${canCancel ? `<button class="wa-list-cancel" data-id="${m.id}"
-                                style="padding: 6px 10px; background: transparent; border: 1px solid rgba(220,38,38,0.6); color: #fca5a5; border-radius: 6px; font-size: 11px; cursor: pointer; transition: background 0.15s, border-color 0.15s;"
-                                title="${t("buttonDelete")}">
-                                ${t("buttonDelete")}
-                            </button>` : ""}
+                        ${delivered ? `
+                            <div style="font-size: 10px; color: #00a884; opacity: 0.85;">
+                                ✓ ${t("labelDeliveredAt")} ${delivered}
+                            </div>
+                        ` : ""}
+                        <div style="margin-top: 6px; font-size: 11px; display: flex; gap: 10px; align-items: center;">
+                            <span style="padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.08); color: ${statusColor}; font-weight: 700;">${statusLabel}</span>
+                            ${m.chatTitle ? `<span style="color: rgba(255,255,255,0.7);">💬 ${m.chatTitle}</span>` : ""}
                         </div>
                     </div>
+                    ${m.status === "scheduled" || m.status === "sending" ?
+                        `<div style="display: flex; flex-direction: column; gap: 6px;">
+                            <button class="wa-edit" data-id="${m.id}" style="background: rgba(0,168,132,0.12); color: #00a884; border: 1px solid rgba(0,168,132,0.4); padding: 6px 10px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 11px; transition: background 0.15s, border-color 0.15s;">${t("buttonEdit")}</button>
+                            <button class="wa-cancel" data-id="${m.id}" style="background: rgba(220,38,38,0.12); color: #ef4444; border: 1px solid rgba(220,38,38,0.4); padding: 6px 10px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 11px; transition: background 0.15s, border-color 0.15s;">${t("buttonCancel")}</button>
+                        </div>`
+                        : ""
+                    }
                 </div>
             `;
 
             body.appendChild(row);
-        });
 
-        // Event listeners for edit and cancel buttons
-        document.querySelectorAll(".wa-list-edit").forEach((btn) => {
-            btn.addEventListener("mouseover", () => {
-                btn.style.background = "rgba(134,150,160,0.12)";
-                btn.style.borderColor = "rgba(134,150,160,0.9)";
-            });
-            btn.addEventListener("mouseout", () => {
-                btn.style.background = "transparent";
-                btn.style.borderColor = "rgba(134,150,160,0.7)";
-            });
-            btn.addEventListener("click", () => {
-                const msgId = btn.getAttribute("data-id");
-                const msg = msgs.find((m) => m.id === msgId);
-                if (msg) {
-                    openEditDialog(msgId, msg);
-                }
-            });
-        });
-
-        document.querySelectorAll(".wa-list-cancel").forEach((btn) => {
-            btn.addEventListener("mouseover", () => {
-                btn.style.background = "rgba(220,38,38,0.12)";
-                btn.style.borderColor = "rgba(220,38,38,0.9)";
-            });
-            btn.addEventListener("mouseout", () => {
-                btn.style.background = "transparent";
-                btn.style.borderColor = "rgba(220,38,38,0.6)";
-            });
-            btn.addEventListener("click", (e) => {
-                e.stopPropagation();
-                const msgId = btn.getAttribute("data-id");
-                if (confirm(t("confirmCancelSend"))) {
-                    browser.runtime.sendMessage(
-                        { type: "CANCEL_MESSAGE", id: msgId },
-                        (resp) => {
-                            if (resp && resp.ok) {
-                                showToast(t("toastMessageCancelled"), "success");
-                                renderListPanel();
-                            } else {
-                                showToast(t("toastErrorWithDetail", [resp?.error || t("errorNoResponse")]), "error");
+            row.querySelectorAll("button").forEach((btn) => {
+                btn.addEventListener("mouseover", () => {
+                    if (btn.classList.contains("wa-edit")) {
+                        btn.style.background = "rgba(0,168,132,0.2)";
+                        btn.style.borderColor = "rgba(0,168,132,0.5)";
+                    } else {
+                        btn.style.background = "rgba(220,38,38,0.2)";
+                        btn.style.borderColor = "rgba(220,38,38,0.6)";
+                    }
+                });
+                btn.addEventListener("mouseout", () => {
+                    if (btn.classList.contains("wa-edit")) {
+                        btn.style.background = "rgba(0,168,132,0.12)";
+                        btn.style.borderColor = "rgba(0,168,132,0.4)";
+                    } else {
+                        btn.style.background = "rgba(220,38,38,0.12)";
+                        btn.style.borderColor = "rgba(220,38,38,0.4)";
+                    }
+                });
+                btn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    const msgId = btn.getAttribute("data-id");
+                    if (confirm(t("confirmCancelSend"))) {
+                        browser.runtime.sendMessage(
+                            { type: "CANCEL_MESSAGE", id: msgId },
+                            (resp) => {
+                                if (resp && resp.ok) {
+                                    showToast(t("toastMessageCancelled"), "success");
+                                    renderListPanel(host);
+                                } else {
+                                    showToast(t("toastErrorWithDetail", [resp?.error || t("errorNoResponse")]), "error");
+                                }
                             }
-                        }
-                    );
-                }
+                        );
+                    }
+                });
             });
         });
     });
@@ -1022,143 +1030,77 @@ async function renderListPanel() {
 
 // -------------------------
 // Enhanced scheduling panel
-// -------------------------
 
-async function createSchedulerUI() {
-    await ensureLocaleReady();
+function updateHeaderForMode() {
+    const backBtn = document.getElementById("wa-scheduler-back");
+    const titleEl = document.getElementById("wa-scheduler-title");
 
-    const existing = document.getElementById("wa-scheduler-panel");
-    if (existing) {
-        existing.remove();
-        return;
+    if (!backBtn || !titleEl) return;
+
+    if (waSchedulerMode === "schedule") {
+        backBtn.style.display = "none";
+        titleEl.textContent = t("panelTitleSchedule") || "Schedule message";
+    } else {
+        backBtn.style.display = "inline-flex";
+        titleEl.textContent = t("listTitle") || "Scheduled messages";
     }
+}
+
+function renderScheduleView(root) {
+    if (!root) return;
 
     const labelAfter = t("labelScheduleAfter") || "Enviar después de";
     const labelAt = t("labelScheduleAt") || "Enviar en fecha/hora";
     const labelAtField = t("labelScheduleAtField") || "Fecha y hora";
-
-    const panel = document.createElement("div");
-    panel.id = "wa-scheduler-panel";
-    panel.style.cssText = `
-        position: fixed;
-        bottom: 84px;
-        right: 80px;
-        z-index: 99999;
-        color: #e9edef;
-        font-size: 12px;
-        width: 340px;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        animation: slideUp 0.25s ease-out;
-    `;
-
     const chatTitle = getActiveChatTitle() || t("labelChatUnknown");
 
-    panel.innerHTML = `
-        <style>
-            @keyframes slideUp {
-                from {
-                    transform: translateY(16px);
-                    opacity: 0;
-                }
-                to {
-                    transform: translateY(0);
-                    opacity: 1;
-                }
-            }
-            #wa-scheduler-panel input,
-            #wa-scheduler-panel textarea {
-                background: #202c33;
-                border: 1px solid rgba(134,150,160,0.3);
-                color: #e9edef;
-                border-radius: 8px;
-                padding: 9px 10px;
-                font-size: 13px;
-                font-family: inherit;
-                transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
-                box-sizing: border-box;
-            }
-            #wa-scheduler-panel input:focus,
-            #wa-scheduler-panel textarea:focus {
-                background: #202c33;
-                border-color: #00a884;
-                outline: none;
-                box-shadow: 0 0 0 1px rgba(0, 168, 132, 0.4);
-            }
-            #wa-scheduler-panel input::placeholder,
-            #wa-scheduler-panel textarea::placeholder {
-                color: rgba(233, 237, 239, 0.6);
-            }
-            #wa-scheduler-panel input[type=number]::-webkit-inner-spin-button,
-            #wa-scheduler-panel input[type=number]::-webkit-outer-spin-button {
-                -webkit-appearance: none;
-                margin: 0;
-            }
-            #wa-scheduler-panel input[type=number] {
-                -moz-appearance: textfield;
-            }
-        </style>
+    root.innerHTML = `
+        <div style="background: rgba(0, 168, 132, 0.08); border-left: 3px solid #00a884; padding: 8px 10px; border-radius: 8px; font-size: 12px;">
+            <div style="font-weight: 600; font-size: 11px; color: rgba(233,237,239,0.85); letter-spacing: 0.1px;">${t("labelCurrentChat")}</div>
+            <div style="font-weight: 600; color: #e9edef; margin-top: 2px;">${chatTitle}</div>
+        </div>
 
-        <div style="background: #202c33; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.35); overflow: hidden;">
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #202c33; border-bottom: 1px solid rgba(255,255,255,0.08);">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 15px; color: #00a884;">🗓️</span>
-                    <span style="font-weight: 700; font-size: 13px;">${t("panelTitleSchedule")}</span>
-                </div>
-                <button id="wa-close" style="width: 32px; height: 32px; border-radius: 16px; border: none; background: transparent; color: #e9edef; cursor: pointer; transition: background 0.15s; display: flex; align-items: center; justify-content: center; font-size: 16px;" onmouseover="this.style.background='rgba(134,150,160,0.16)'" onmouseout="this.style.background='transparent'">✕</button>
+        <div>
+            <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${t("labelMessage")}</label>
+            <textarea id="wa-msg" placeholder="${t("placeholderMessage")}" style="width: 100%; height: 80px; resize: vertical; border-radius: 8px;"></textarea>
+            <div style="font-size: 11px; color: rgba(241,241,242,0.65); text-align: right; margin-top: 4px;"><span id="wa-char-count">0</span> / 4096</div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div style="grid-column: span 2; display: flex; gap: 10px; align-items: center;">
+                <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                    <input id="wa-mode-relative" type="radio" name="wa-mode" value="relative" checked style="width: 14px; height: 14px;">
+                    <span>${labelAfter}</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                    <input id="wa-mode-datetime" type="radio" name="wa-mode" value="datetime" style="width: 14px; height: 14px;">
+                    <span>${labelAt}</span>
+                </label>
             </div>
-
-            <div style="padding: 12px; display: flex; flex-direction: column; gap: 10px;">
-                <div style="background: rgba(0, 168, 132, 0.08); border-left: 3px solid #00a884; padding: 8px 10px; border-radius: 8px; font-size: 12px;">
-                    <div style="font-weight: 600; font-size: 11px; color: rgba(233,237,239,0.85); letter-spacing: 0.1px;">${t("labelCurrentChat")}</div>
-                    <div style="font-weight: 600; color: #e9edef; margin-top: 2px;">${chatTitle}</div>
-                </div>
-
-                <div>
-                    <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${t("labelMessage")}</label>
-                    <textarea id="wa-msg" placeholder="${t("placeholderMessage")}" style="width: 100%; height: 80px; resize: vertical; border-radius: 8px;"></textarea>
-                    <div style="font-size: 11px; color: rgba(241,241,242,0.65); text-align: right; margin-top: 4px;"><span id="wa-char-count">0</span> / 4096</div>
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div style="grid-column: span 2; display: flex; gap: 10px; align-items: center;">
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
-                            <input id="wa-mode-relative" type="radio" name="wa-mode" value="relative" checked style="width: 14px; height: 14px;">
-                            <span>${labelAfter}</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
-                            <input id="wa-mode-datetime" type="radio" name="wa-mode" value="datetime" style="width: 14px; height: 14px;">
-                            <span>${labelAt}</span>
-                        </label>
-                    </div>
-                    <div>
-                        <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${t("labelHours")}</label>
-                        <input id="wa-hours" type="number" min="0" max="999" value="0" style="width: 100%; padding: 8px 10px; border-radius: 6px;">
-                    </div>
-                    <div>
-                        <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${t("labelMinutes")}</label>
-                        <input id="wa-mins" type="number" min="0" max="59" value="0" style="width: 100%; padding: 8px 10px; border-radius: 6px;">
-                    </div>
-                    <div style="grid-column: span 2;">
-                        <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${labelAtField}</label>
-                        <input id="wa-datetime" type="datetime-local" style="width: 100%; padding: 8px 10px; border-radius: 6px;">
-                    </div>
-                </div>
-
-                <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
-                    <button id="wa-list" style="background: transparent; border: 1px solid rgba(134,150,160,0.5); color: #e9edef; border-radius: 6px; padding: 8px 12px; font-weight: 600; cursor: pointer; font-size: 12px; transition: border-color 0.15s, background 0.15s;">
-                        ${t("buttonList")}
-                    </button>
-                    <button id="wa-schedule" style="background: #00a884; color: #111b21; border: none; border-radius: 6px; padding: 8px 12px; font-weight: 700; cursor: pointer; font-size: 12px; transition: background 0.15s, box-shadow 0.15s;">
-                        ${t("buttonSchedule")}
-                    </button>
-                </div>
+            <div>
+                <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${t("labelHours")}</label>
+                <input id="wa-hours" type="number" min="0" max="999" value="0" style="width: 100%; padding: 8px 10px; border-radius: 6px;">
             </div>
+            <div>
+                <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${t("labelMinutes")}</label>
+                <input id="wa-mins" type="number" min="0" max="59" value="0" style="width: 100%; padding: 8px 10px; border-radius: 6px;">
+            </div>
+            <div style="grid-column: span 2;">
+                <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${labelAtField}</label>
+                <input id="wa-datetime" type="datetime-local" style="width: 100%; padding: 8px 10px; border-radius: 6px;">
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
+            <button id="wa-list" style="background: transparent; border: 1px solid rgba(134,150,160,0.5); color: #e9edef; border-radius: 6px; padding: 8px 12px; font-weight: 600; cursor: pointer; font-size: 12px; transition: border-color 0.15s, background 0.15s;">
+                ${t("buttonList")}
+            </button>
+            <button id="wa-schedule" style="background: #00a884; color: #111b21; border: none; border-radius: 6px; padding: 8px 12px; font-weight: 700; cursor: pointer; font-size: 12px; transition: background 0.15s, box-shadow 0.15s;">
+                ${t("buttonSchedule")}
+            </button>
         </div>
     `;
 
-    document.body.appendChild(panel);
-
-    // Character counter
     const msgInput = document.getElementById("wa-msg");
     const charCount = document.getElementById("wa-char-count");
     msgInput.addEventListener("input", () => {
@@ -1192,8 +1134,13 @@ async function createSchedulerUI() {
         listBtn.style.borderColor = "rgba(134,150,160,0.5)";
     };
 
-    document.getElementById("wa-close").onclick = () => panel.remove();
-    document.getElementById("wa-list").onclick = () => renderListPanel();
+    listBtn.onclick = () => {
+        const body = document.getElementById("wa-scheduler-body");
+        if (!body) return;
+        waSchedulerMode = "list";
+        renderListView(body);
+        updateHeaderForMode();
+    };
 
     const modeRelative = document.getElementById("wa-mode-relative");
     const modeDatetime = document.getElementById("wa-mode-datetime");
@@ -1233,7 +1180,6 @@ async function createSchedulerUI() {
         let totalMins = 0;
 
         if (isRelativeMode) {
-            // Relative delay branch (hours/minutes)
             totalMins = hours * 60 + mins;
             if (totalMins <= 0) {
                 showToast(t("toastNeedTime"), "warning");
@@ -1242,7 +1188,6 @@ async function createSchedulerUI() {
 
             delayMs = totalMins * 60 * 1000;
         } else {
-            // Absolute datetime branch
             const dtValue = datetimeInput.value;
             const sendAt = dtValue ? new Date(dtValue).getTime() : NaN;
             delayMs = sendAt - Date.now();
@@ -1274,7 +1219,7 @@ async function createSchedulerUI() {
                     minsInput.value = "0";
                     datetimeInput.value = "";
                     charCount.textContent = "0";
-                    setTimeout(() => panel.remove(), 500);
+                    setTimeout(() => document.getElementById("wa-scheduler-panel")?.remove(), 500);
                 } else {
                     showToast(t("toastErrorWithDetail", [resp?.error || t("errorNoResponse")]), "error", 5000);
                 }
@@ -1282,13 +1227,107 @@ async function createSchedulerUI() {
         );
     };
 
-    // Focus on the text field
     setTimeout(() => msgInput.focus(), 100);
+}
+
+function renderListView(root) {
+    const headerTitle = document.getElementById("wa-scheduler-title");
+    if (headerTitle) headerTitle.textContent = t("listTitle") || "Scheduled messages";
+
+    if (root) {
+        root.innerHTML = "";
+        renderListPanel(root);
+    }
+}
+
+async function createSchedulerUI() {
+    await ensureLocaleReady();
+
+    const existing = document.getElementById("wa-scheduler-panel");
+    if (existing) {
+        existing.remove();
+        return;
+    }
+
+    const panel = document.createElement("div");
+    panel.id = "wa-scheduler-panel";
+    panel.style.cssText = `
+        position: fixed;
+        bottom: 84px;
+        right: 80px;
+        z-index: 99999;
+        color: #e9edef;
+        font-size: 12px;
+        width: 340px;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        animation: slideUp 0.25s ease-out;
+    `;
+
+    panel.innerHTML = `
+        <style>
+            @keyframes slideUp {
+                from {
+                    transform: translateY(16px);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateY(0);
+                    opacity: 1;
+                }
+            }
+            #wa-scheduler-panel input,
+            #wa-scheduler-panel textarea {                background: #202c33;                border: 1px solid rgba(134,150,160,0.3);                color: #e9edef;                border-radius: 8px;                padding: 9px 10px;                font-size: 13px;                font-family: inherit;                transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;                box-sizing: border-box;            }
+            #wa-scheduler-panel input:focus,
+            #wa-scheduler-panel textarea:focus {                background: #202c33;                border-color: #00a884;                outline: none;                box-shadow: 0 0 0 1px rgba(0, 168, 132, 0.4);            }
+            #wa-scheduler-panel input::placeholder,
+            #wa-scheduler-panel textarea::placeholder {                color: rgba(233, 237, 239, 0.6);            }
+            #wa-scheduler-panel input[type=number]::-webkit-inner-spin-button,
+            #wa-scheduler-panel input[type=number]::-webkit-outer-spin-button {                -webkit-appearance: none;                margin: 0;            }
+            #wa-scheduler-panel input[type=number] {                -moz-appearance: textfield;            }
+        </style>
+
+        <div id="wa-scheduler-inner" style="background: #202c33; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.35); overflow: hidden;">
+            <div id="wa-scheduler-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #202c33; border-bottom: 1px solid rgba(255,255,255,0.08); gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                    <button id="wa-scheduler-back" style="width: 28px; height: 28px; border-radius: 14px; border: none; background: transparent; color: #e9edef; cursor: pointer; transition: background 0.15s; display: none; align-items: center; justify-content: center; font-size: 14px;" onmouseover="this.style.background='rgba(134,150,160,0.16)'" onmouseout="this.style.background='transparent'">←</button>
+                    <span style="font-size: 15px; color: #00a884;">🗓️</span>
+                    <span id="wa-scheduler-title" style="font-weight: 700; font-size: 13px;">${t("panelTitleSchedule")}</span>
+                </div>
+                <button id="wa-close" style="width: 32px; height: 32px; border-radius: 16px; border: none; background: transparent; color: #e9edef; cursor: pointer; transition: background 0.15s; display: flex; align-items: center; justify-content: center; font-size: 16px;" onmouseover="this.style.background='rgba(134,150,160,0.16)'" onmouseout="this.style.background='transparent'">✕</button>
+            </div>
+
+            <div id="wa-scheduler-body" style="padding: 12px; display: flex; flex-direction: column; gap: 10px;"></div>
+        </div>
+    `;
+
+    document.body.appendChild(panel);
+
+    const closeBtn = document.getElementById("wa-close");
+    closeBtn.onclick = () => panel.remove();
+
+    const backBtn = document.getElementById("wa-scheduler-back");
+    if (backBtn) {
+        backBtn.addEventListener("click", () => {
+            waSchedulerMode = "schedule";
+            const body = document.getElementById("wa-scheduler-body");
+            if (body) renderScheduleView(body);
+            updateHeaderForMode();
+        });
+    }
+
+    waSchedulerMode = "schedule";
+    const body = panel.querySelector("#wa-scheduler-body");
+    renderScheduleView(body);
+    updateHeaderForMode();
 }
 
 // -------------------------
 // Floating button
 // -------------------------
+
+function attachScheduleButtonToComposer() {
+    createFloatingButton();
+}
 
 async function createFloatingButton() {
     await ensureLocaleReady();

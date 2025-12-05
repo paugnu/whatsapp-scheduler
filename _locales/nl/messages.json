@@ -155,6 +155,9 @@
   "toastMessageUpdated": {
     "message": "✓ Bericht bijgewerkt"
   },
+  "labelDeliveredAt": {
+    "message": "Delivered at"
+  },
   "listSubtitle": {
     "message": "Verzendgeschiedenis"
   }

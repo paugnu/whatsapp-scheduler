@@ -273,19 +273,8 @@ function nameMatchScore(target, candidate) {
     const c = normalizeName(candidate);
 
     if (!t || !c) return 0;
-    if (t === c) return 3;
-
-    if (c.startsWith(t)) {
-        const rest = c.slice(t.length);
-        if (rest === "" || /^([\s\(\[\{.,-]|–|—)/.test(rest)) return 2;
-    }
-
-    if (t.startsWith(c)) {
-        const rest = t.slice(c.length);
-        if (rest === "" || /^([\s\(\[\{.,-]|–|—)/.test(rest)) return 1;
-    }
-
-    return 0;
+    // strict equality only
+    return t === c ? 1 : 0;
 }
 
 function namesMatch(target, candidate) {
@@ -333,23 +322,18 @@ function openChatByTitle(title, avatarKey) {
         const text = span.textContent || span.getAttribute("title");
         if (!text) continue;
 
-        const score = nameMatchScore(title, text);
-        if (score > 0) {
+        if (namesMatch(title, text)) {
             const row = span.closest('div[role="row"]') || span.closest('div[role="button"]');
             if (row) {
-                matches.push({ span, row, text, score });
+                matches.push({ span, row, text });
             }
         }
     }
 
     if (!matches.length) return { found: false };
 
-    matches.sort((a, b) => b.score - a.score);
-    const bestScore = matches[0].score;
-    const bestMatches = matches.filter((m) => m.score === bestScore);
-
-    if (bestMatches.length === 1) {
-        const match = bestMatches[0];
+    if (matches.length === 1) {
+        const match = matches[0];
         console.log(`[WA Scheduler] Chat encontrado: "${match.text}". Abriendo...`);
         match.row.scrollIntoView({ block: "center", behavior: "instant" });
         superClick(match.span);
@@ -358,7 +342,7 @@ function openChatByTitle(title, avatarKey) {
     }
 
     if (avatarKey) {
-        const avatarMatches = bestMatches.filter((match) => {
+        const avatarMatches = matches.filter((match) => {
             const rowAvatar = getRowAvatarKey(match.row);
             return rowAvatar && rowAvatar === avatarKey;
         });

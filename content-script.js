@@ -124,6 +124,20 @@ async function ensureLocaleReady() {
 
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
+function setStyles(element, styles = {}) {
+    if (!element || !styles) return;
+    Object.entries(styles).forEach(([key, value]) => {
+        element.style[key] = value;
+    });
+}
+
+function clearElement(element) {
+    if (!element) return;
+    while (element.firstChild) {
+        element.removeChild(element.firstChild);
+    }
+}
+
 // CLICK NUCLEAR: fire pointer + mouse events so React handlers receive them
 function superClick(element) {
     if (!element) return;
@@ -616,136 +630,266 @@ function startChatObserver() {
 // Edit modal
 // -------------------------
 
-async function openEditDialog(msgId, msg) {
+async function openEditDialog(msgId, msg, host) {
     await ensureLocaleReady();
 
-    // Remove existing modal if present
     const existing = document.getElementById("wa-edit-modal");
     if (existing) existing.remove();
 
     const modal = document.createElement("div");
     modal.id = "wa-edit-modal";
-    modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.65);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 100000;
-        animation: fadeIn 0.2s ease-out;
-    `;
+    setStyles(modal, {
+        position: "fixed",
+        top: "0",
+        left: "0",
+        width: "100%",
+        height: "100%",
+        background: "rgba(0, 0, 0, 0.65)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: "100000",
+        animation: "fadeIn 0.2s ease-out"
+    });
 
     const content = document.createElement("div");
-    content.style.cssText = `
-        background: #202c33;
-        color: #e9edef;
-        padding: 16px 16px 14px;
-        border-radius: 8px;
-        width: 90%;
-        max-width: 480px;
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        animation: slideUp 0.25s ease-out;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    setStyles(content, {
+        background: "#202c33",
+        color: "#e9edef",
+        padding: "16px 16px 14px",
+        borderRadius: "8px",
+        width: "90%",
+        maxWidth: "480px",
+        boxShadow: "0 2px 12px rgba(0, 0, 0, 0.35)",
+        border: "1px solid rgba(255, 255, 255, 0.08)",
+        animation: "slideUp 0.25s ease-out",
+        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    });
+
+    const styleEl = document.createElement("style");
+    styleEl.textContent = `
+        #wa-edit-modal input,
+        #wa-edit-modal textarea {
+            background: #202c33;
+            border: 1px solid rgba(134,150,160,0.3);
+            color: #e9edef;
+            border-radius: 8px;
+            padding: 9px 10px;
+            font-size: 13px;
+            font-family: inherit;
+            transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        #wa-edit-modal input:focus,
+        #wa-edit-modal textarea:focus {
+            background: #202c33;
+            border-color: #00a884;
+            outline: none;
+            box-shadow: 0 0 0 1px rgba(0, 168, 132, 0.4);
+        }
+        #wa-edit-modal input::placeholder,
+        #wa-edit-modal textarea::placeholder {
+            color: rgba(233, 237, 239, 0.6);
+        }
+        #wa-edit-modal input[type=number]::-webkit-inner-spin-button,
+        #wa-edit-modal input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        #wa-edit-modal input[type=number] {
+            -moz-appearance: textfield;
+        }
     `;
+    content.appendChild(styleEl);
+
+    const title = document.createElement("div");
+    title.textContent = t("labelEditMessageTitle");
+    setStyles(title, { fontWeight: "700", fontSize: "13px", marginBottom: "14px" });
+    content.appendChild(title);
+
+    const chatWrapper = document.createElement("div");
+    setStyles(chatWrapper, { marginBottom: "12px" });
+    const chatLabel = document.createElement("label");
+    chatLabel.textContent = t("labelChat");
+    setStyles(chatLabel, {
+        display: "block",
+        fontSize: "11px",
+        opacity: "0.8",
+        marginBottom: "4px",
+        fontWeight: "600",
+        letterSpacing: "0.1px"
+    });
+    const chatValue = document.createElement("div");
+    chatValue.textContent = msg.chatTitle || t("labelNoChat");
+    setStyles(chatValue, {
+        background: "rgba(0, 168, 132, 0.08)",
+        padding: "8px 10px",
+        borderRadius: "8px",
+        borderLeft: "3px solid #00a884",
+        fontSize: "13px",
+        color: "#e9edef"
+    });
+    chatWrapper.appendChild(chatLabel);
+    chatWrapper.appendChild(chatValue);
+    content.appendChild(chatWrapper);
+
+    const messageWrapper = document.createElement("div");
+    setStyles(messageWrapper, { marginBottom: "12px" });
+    const messageLabel = document.createElement("label");
+    messageLabel.textContent = t("labelMessage");
+    setStyles(messageLabel, {
+        display: "block",
+        fontSize: "11px",
+        opacity: "0.8",
+        marginBottom: "4px",
+        fontWeight: "600",
+        letterSpacing: "0.1px"
+    });
+    const textInput = document.createElement("textarea");
+    textInput.id = "wa-edit-text";
+    textInput.value = msg.text;
+    setStyles(textInput, { height: "110px", resize: "vertical", marginBottom: "6px", borderRadius: "8px" });
+    const charContainer = document.createElement("div");
+    setStyles(charContainer, { fontSize: "11px", opacity: "0.65", textAlign: "right" });
+    const charCount = document.createElement("span");
+    charCount.id = "wa-edit-char-count";
+    charCount.textContent = String(msg.text.length);
+    charContainer.appendChild(charCount);
+    charContainer.appendChild(document.createTextNode(" / 4096"));
+    messageWrapper.appendChild(messageLabel);
+    messageWrapper.appendChild(textInput);
+    messageWrapper.appendChild(charContainer);
+    content.appendChild(messageWrapper);
+
+    const grid = document.createElement("div");
+    setStyles(grid, {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: "10px",
+        marginBottom: "12px",
+        alignItems: "end"
+    });
+
+    const hoursWrapper = document.createElement("div");
+    const hoursLabel = document.createElement("label");
+    hoursLabel.textContent = t("labelHours");
+    setStyles(hoursLabel, {
+        display: "block",
+        fontSize: "11px",
+        opacity: "0.8",
+        marginBottom: "4px",
+        fontWeight: "600",
+        letterSpacing: "0.1px"
+    });
+    const hoursInput = document.createElement("input");
+    hoursInput.id = "wa-edit-hours";
+    hoursInput.type = "number";
+    hoursInput.min = "0";
+    hoursInput.max = "999";
+    hoursInput.value = String(Math.max(0, Math.floor((msg.sendAt - Date.now()) / (1000 * 60 * 60))));
+    setStyles(hoursInput, { padding: "8px 10px", borderRadius: "6px" });
+    hoursWrapper.appendChild(hoursLabel);
+    hoursWrapper.appendChild(hoursInput);
+
+    const minsWrapper = document.createElement("div");
+    const minsLabel = document.createElement("label");
+    minsLabel.textContent = t("labelMinutes");
+    setStyles(minsLabel, {
+        display: "block",
+        fontSize: "11px",
+        opacity: "0.8",
+        marginBottom: "4px",
+        fontWeight: "600",
+        letterSpacing: "0.1px"
+    });
+    const minsInput = document.createElement("input");
+    minsInput.id = "wa-edit-mins";
+    minsInput.type = "number";
+    minsInput.min = "0";
+    minsInput.max = "59";
+    minsInput.value = String(
+        Math.max(0, Math.floor(((msg.sendAt - Date.now()) % (1000 * 60 * 60)) / (1000 * 60)))
+    );
+    setStyles(minsInput, { padding: "8px 10px", borderRadius: "6px" });
+    minsWrapper.appendChild(minsLabel);
+    minsWrapper.appendChild(minsInput);
+
+    grid.appendChild(hoursWrapper);
+    grid.appendChild(minsWrapper);
+    content.appendChild(grid);
 
     const sendAtDate = new Date(msg.sendAt);
-    const hours = Math.floor((msg.sendAt - Date.now()) / (1000 * 60 * 60));
-    const mins = Math.floor(((msg.sendAt - Date.now()) % (1000 * 60 * 60)) / (1000 * 60));
+    const info = document.createElement("div");
+    info.textContent = t("labelScheduledFor", [sendAtDate.toLocaleString()]);
+    setStyles(info, {
+        background: "rgba(83, 189, 235, 0.12)",
+        padding: "10px",
+        borderRadius: "8px",
+        marginBottom: "14px",
+        fontSize: "11px",
+        opacity: "0.9",
+        border: "1px solid rgba(83,189,235,0.2)"
+    });
+    content.appendChild(info);
 
-    content.innerHTML = `
-        <style>
-            #wa-edit-modal input,
-            #wa-edit-modal textarea {
-                background: #202c33;
-                border: 1px solid rgba(134,150,160,0.3);
-                color: #e9edef;
-                border-radius: 8px;
-                padding: 9px 10px;
-                font-size: 13px;
-                font-family: inherit;
-                transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
-                width: 100%;
-                box-sizing: border-box;
-            }
-            #wa-edit-modal input:focus,
-            #wa-edit-modal textarea:focus {
-                background: #202c33;
-                border-color: #00a884;
-                outline: none;
-                box-shadow: 0 0 0 1px rgba(0, 168, 132, 0.4);
-            }
-            #wa-edit-modal input::placeholder,
-            #wa-edit-modal textarea::placeholder {
-                color: rgba(233, 237, 239, 0.6);
-            }
-            #wa-edit-modal input[type=number]::-webkit-inner-spin-button,
-            #wa-edit-modal input[type=number]::-webkit-outer-spin-button {
-                -webkit-appearance: none;
-                margin: 0;
-            }
-            #wa-edit-modal input[type=number] {
-                -moz-appearance: textfield;
-            }
-        </style>
+    const actions = document.createElement("div");
+    setStyles(actions, { display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "6px" });
 
-        <div style="font-weight: 700; font-size: 13px; margin-bottom: 14px;">${t("labelEditMessageTitle")}</div>
+    const saveBtn = document.createElement("button");
+    saveBtn.id = "wa-edit-save";
+    saveBtn.textContent = t("buttonSave");
+    setStyles(saveBtn, {
+        background: "#00a884",
+        color: "#111b21",
+        border: "none",
+        padding: "9px 14px",
+        borderRadius: "6px",
+        cursor: "pointer",
+        fontWeight: "700",
+        fontSize: "13px",
+        transition: "background 0.15s, box-shadow 0.15s",
+        minWidth: "110px"
+    });
+    saveBtn.addEventListener("mouseover", () => {
+        saveBtn.style.background = "#029273";
+        saveBtn.style.boxShadow = "0 2px 8px rgba(0,0,0,0.35)";
+    });
+    saveBtn.addEventListener("mouseout", () => {
+        saveBtn.style.background = "#00a884";
+        saveBtn.style.boxShadow = "none";
+    });
 
-        <div style="margin-bottom: 12px;">
-            <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${t("labelChat")}</label>
-            <div style="background: rgba(0, 168, 132, 0.08); padding: 8px 10px; border-radius: 8px; border-left: 3px solid #00a884; font-size: 13px; color: #e9edef;">
-                ${msg.chatTitle || t("labelNoChat")}
-            </div>
-        </div>
+    const cancelBtn = document.createElement("button");
+    cancelBtn.id = "wa-edit-cancel";
+    cancelBtn.textContent = t("buttonCancel");
+    setStyles(cancelBtn, {
+        background: "transparent",
+        color: "#e9edef",
+        border: "1px solid rgba(134,150,160,0.5)",
+        padding: "9px 14px",
+        borderRadius: "6px",
+        cursor: "pointer",
+        fontWeight: "600",
+        fontSize: "13px",
+        transition: "border-color 0.15s, background 0.15s",
+        minWidth: "110px"
+    });
+    cancelBtn.addEventListener("mouseover", () => {
+        cancelBtn.style.background = "rgba(134,150,160,0.1)";
+        cancelBtn.style.borderColor = "rgba(134,150,160,0.8)";
+    });
+    cancelBtn.addEventListener("mouseout", () => {
+        cancelBtn.style.background = "transparent";
+        cancelBtn.style.borderColor = "rgba(134,150,160,0.5)";
+    });
 
-        <div style="margin-bottom: 12px;">
-            <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${t("labelMessage")}</label>
-            <textarea id="wa-edit-text" style="height: 110px; resize: vertical; margin-bottom: 6px; border-radius: 8px;">${msg.text}</textarea>
-            <div style="font-size: 11px; opacity: 0.65; text-align: right;"><span id="wa-edit-char-count">${msg.text.length}</span> / 4096</div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; align-items: end;">
-            <div>
-                <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${t("labelHours")}</label>
-                <input id="wa-edit-hours" type="number" min="0" max="999" value="${hours}" style="padding: 8px 10px; border-radius: 6px;">
-            </div>
-            <div>
-                <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${t("labelMinutes")}</label>
-                <input id="wa-edit-mins" type="number" min="0" max="59" value="${mins}" style="padding: 8px 10px; border-radius: 6px;">
-            </div>
-        </div>
-
-        <div style="background: rgba(83, 189, 235, 0.12); padding: 10px; border-radius: 8px; margin-bottom: 14px; font-size: 11px; opacity: 0.9; border: 1px solid rgba(83,189,235,0.2);">
-            ${t("labelScheduledFor", [sendAtDate.toLocaleString()])}
-        </div>
-
-        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px;">
-            <button id="wa-edit-save"
-                style="background: #00a884; color: #111b21; border: none; padding: 9px 14px; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 13px; transition: background 0.15s, box-shadow 0.15s; min-width: 110px;"
-                onmouseover="this.style.background='#029273'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.35)'"
-                onmouseout="this.style.background='#00a884'; this.style.boxShadow='none'">
-                ${t("buttonSave")}
-            </button>
-
-            <button id="wa-edit-cancel"
-                style="background: transparent; color: #e9edef; border: 1px solid rgba(134,150,160,0.5); padding: 9px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: border-color 0.15s, background 0.15s; min-width: 110px;"
-                onmouseover="this.style.background='rgba(134,150,160,0.1)'; this.style.borderColor='rgba(134,150,160,0.8)'"
-                onmouseout="this.style.background='transparent'; this.style.borderColor='rgba(134,150,160,0.5)'">
-                ${t("buttonCancel")}
-            </button>
-        </div>
-    `;
+    actions.appendChild(saveBtn);
+    actions.appendChild(cancelBtn);
+    content.appendChild(actions);
 
     modal.appendChild(content);
     document.body.appendChild(modal);
-
-    // Character counter
-    const textInput = document.getElementById("wa-edit-text");
-    const charCount = document.getElementById("wa-edit-char-count");
 
     textInput.addEventListener("input", () => {
         charCount.textContent = textInput.value.length;
@@ -758,16 +902,8 @@ async function openEditDialog(msgId, msg) {
         }
     });
 
-    // Focus on the textarea
     setTimeout(() => textInput.focus(), 100);
 
-    // Cancel button
-    document.getElementById("wa-edit-cancel").addEventListener("click", () => {
-        modal.style.animation = "slideOut 0.3s ease-in";
-        setTimeout(() => modal.remove(), 300);
-    });
-
-    // Close with ESC
     const escapeHandler = (e) => {
         if (e.key === "Escape") {
             modal.style.animation = "slideOut 0.3s ease-in";
@@ -779,11 +915,15 @@ async function openEditDialog(msgId, msg) {
     };
     document.addEventListener("keydown", escapeHandler);
 
-    // Save button
-    document.getElementById("wa-edit-save").addEventListener("click", () => {
+    cancelBtn.addEventListener("click", () => {
+        modal.style.animation = "slideOut 0.3s ease-in";
+        setTimeout(() => modal.remove(), 300);
+    });
+
+    saveBtn.addEventListener("click", () => {
         const newText = textInput.value.trim();
-        const newHours = parseInt(document.getElementById("wa-edit-hours").value || "0", 10);
-        const newMins = parseInt(document.getElementById("wa-edit-mins").value || "0", 10);
+        const newHours = parseInt(hoursInput.value || "0", 10);
+        const newMins = parseInt(minsInput.value || "0", 10);
 
         if (!newText) {
             showToast(t("toastWriteMessage"), "warning");
@@ -811,14 +951,14 @@ async function openEditDialog(msgId, msg) {
                 delayMs: newDelayMs
             },
             (resp) => {
-                                if (resp && resp.ok) {
-                                    showToast(t("toastMessageUpdated"), "success");
-                                    modal.style.animation = "slideOut 0.3s ease-in";
-                                    setTimeout(() => {
-                                        modal.remove();
-                                        document.removeEventListener("keydown", escapeHandler);
-                                        renderListPanel(host);
-                                    }, 300);
+                if (resp && resp.ok) {
+                    showToast(t("toastMessageUpdated"), "success");
+                    modal.style.animation = "slideOut 0.3s ease-in";
+                    setTimeout(() => {
+                        modal.remove();
+                        document.removeEventListener("keydown", escapeHandler);
+                        renderListPanel(host);
+                    }, 300);
                 } else {
                     showToast(t("toastErrorWithDetail", [resp?.error || t("errorNoResponse")]), "error", 5000);
                 }
@@ -826,7 +966,6 @@ async function openEditDialog(msgId, msg) {
         );
     });
 
-    // Close when clicking outside the modal
     modal.addEventListener("click", (e) => {
         if (e.target === modal) {
             modal.style.animation = "slideOut 0.3s ease-in";
@@ -846,76 +985,129 @@ async function renderListPanel(host) {
 
     let body = null;
 
+    const buildHeader = (container, includeClose) => {
+        const header = document.createElement("div");
+        setStyles(header, {
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "12px",
+            paddingBottom: "8px",
+            borderBottom: "1px solid rgba(255,255,255,0.08)"
+        });
+
+        const titleWrap = document.createElement("div");
+        const title = document.createElement("div");
+        title.textContent = t("listTitle");
+        setStyles(title, { fontWeight: "700", fontSize: "13px", marginBottom: "2px" });
+        const subtitle = document.createElement("div");
+        subtitle.textContent = t("listSubtitle");
+        setStyles(subtitle, { fontSize: "11px", color: "rgba(241,241,242,0.6)" });
+        titleWrap.appendChild(title);
+        titleWrap.appendChild(subtitle);
+        header.appendChild(titleWrap);
+
+        if (includeClose) {
+            const closeBtn = document.createElement("button");
+            closeBtn.id = "wa-list-close";
+            closeBtn.textContent = "✕";
+            setStyles(closeBtn, {
+                width: "32px",
+                height: "32px",
+                background: "transparent",
+                color: "#e9edef",
+                border: "none",
+                borderRadius: "16px",
+                cursor: "pointer",
+                fontSize: "16px",
+                transition: "background 0.15s",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+            });
+            closeBtn.addEventListener("mouseover", () => {
+                closeBtn.style.background = "rgba(134,150,160,0.16)";
+            });
+            closeBtn.addEventListener("mouseout", () => {
+                closeBtn.style.background = "transparent";
+            });
+            closeBtn.onclick = () => container.remove();
+            header.appendChild(closeBtn);
+        }
+
+        container.appendChild(header);
+    };
+
     if (host) {
-        host.innerHTML = `
-            <div style="margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);">
-                <div style="font-weight: 700; font-size: 13px; margin-bottom: 2px;">${t("listTitle")}</div>
-                <div style="font-size: 11px; color: rgba(241,241,242,0.6);">${t("listSubtitle")}</div>
-            </div>
-            <div id="wa-scheduler-list-body" style="max-height: 55vh; overflow-y: auto;">${t("listLoading")}</div>
-        `;
-        body = host.querySelector("#wa-scheduler-list-body");
+        clearElement(host);
+        buildHeader(host, false);
+        body = document.createElement("div");
+        body.id = "wa-scheduler-list-body";
+        setStyles(body, { maxHeight: "55vh", overflowY: "auto" });
+        body.textContent = t("listLoading");
+        host.appendChild(body);
     } else {
         const existing = document.getElementById("wa-scheduler-list");
         if (existing) existing.remove();
 
         const panel = document.createElement("div");
         panel.id = "wa-scheduler-list";
-        panel.style.cssText = `
-            position: fixed;
-            bottom: 80px;
-            right: 320px;
-            z-index: 99999;
-            background: #202c33;
-            color: #e9edef;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 11px;
-            width: 380px;
-            max-height: 68vh;
-            overflow-y: auto;
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        `;
+        setStyles(panel, {
+            position: "fixed",
+            bottom: "80px",
+            right: "320px",
+            zIndex: "99999",
+            background: "#202c33",
+            color: "#e9edef",
+            padding: "12px",
+            borderRadius: "8px",
+            fontSize: "11px",
+            width: "380px",
+            maxHeight: "68vh",
+            overflowY: "auto",
+            boxShadow: "0 2px 12px rgba(0, 0, 0, 0.35)",
+            border: "1px solid rgba(255, 255, 255, 0.06)",
+            fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        });
 
-        panel.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);">
-                <div>
-                    <div style="font-weight: 700; font-size: 13px; margin-bottom: 2px;">${t("listTitle")}</div>
-                    <div style="font-size: 11px; color: rgba(241,241,242,0.6);">${t("listSubtitle")}</div>
-                </div>
-                <button id="wa-list-close"
-                    style="width: 32px; height: 32px; background: transparent; color: #e9edef; border: none; border-radius: 16px; cursor: pointer; font-size: 16px; transition: background 0.15s; display: flex; align-items: center; justify-content: center;"
-                    onmouseover="this.style.background='rgba(134,150,160,0.16)'"
-                    onmouseout="this.style.background='transparent'">✕</button>
-            </div>
-            <div id="wa-scheduler-list-body" style="max-height: 55vh; overflow-y: auto;">${t("listLoading")}</div>
-        `;
+        buildHeader(panel, true);
+        body = document.createElement("div");
+        body.id = "wa-scheduler-list-body";
+        setStyles(body, { maxHeight: "55vh", overflowY: "auto" });
+        body.textContent = t("listLoading");
+        panel.appendChild(body);
 
         document.body.appendChild(panel);
-
-        const closeBtn = document.getElementById("wa-list-close");
-        closeBtn.onclick = () => panel.remove();
-        body = document.getElementById("wa-scheduler-list-body");
     }
 
     if (!body) return;
 
     browser.runtime.sendMessage({ type: "GET_MESSAGES" }, (resp) => {
         if (!resp || !resp.ok) {
-            body.innerHTML = `<div style="color: #ff6b6b; text-align: center; padding: 20px;">${t("listError")}</div>`;
+            clearElement(body);
+            const errorDiv = document.createElement("div");
+            errorDiv.textContent = t("listError");
+            setStyles(errorDiv, { color: "#ff6b6b", textAlign: "center", padding: "20px" });
+            body.appendChild(errorDiv);
             return;
         }
 
         const msgs = resp.messages || [];
         if (!msgs.length) {
-            body.innerHTML = `<div style="color: rgba(255,255,255,0.5); text-align: center; padding: 20px;">${t("listEmpty")}</div>`;
+            clearElement(body);
+            const emptyDiv = document.createElement("div");
+            emptyDiv.textContent = t("listEmpty");
+            setStyles(emptyDiv, {
+                color: "rgba(255,255,255,0.5)",
+                textAlign: "center",
+                padding: "20px"
+            });
+            body.appendChild(emptyDiv);
             return;
         }
 
         msgs.sort((a, b) => (b.sendAt || b.createdAt) - (a.sendAt || a.createdAt));
-        body.innerHTML = "";
+        clearElement(body);
 
         msgs.forEach((m) => {
             const row = document.createElement("div");
@@ -927,23 +1119,23 @@ async function renderListPanel(host) {
                     ? "#f59e0b"
                     : "#53bdeb";
 
-            row.style.cssText = `
-                margin-bottom: 10px;
-                padding: 10px 12px;
-                background: #111b21;
-                border-radius: 6px;
-                border: 1px solid rgba(255,255,255,0.06);
-                transition: background 0.15s, border-color 0.15s;
-            `;
+            setStyles(row, {
+                marginBottom: "10px",
+                padding: "10px 12px",
+                background: "#111b21",
+                borderRadius: "6px",
+                border: "1px solid rgba(255,255,255,0.06)",
+                transition: "background 0.15s, border-color 0.15s"
+            });
 
-            row.onmouseover = () => {
+            row.addEventListener("mouseover", () => {
                 row.style.background = "rgba(17,27,33,0.9)";
                 row.style.borderColor = "rgba(255,255,255,0.12)";
-            };
-            row.onmouseout = () => {
+            });
+            row.addEventListener("mouseout", () => {
                 row.style.background = "#111b21";
                 row.style.borderColor = "rgba(255,255,255,0.06)";
-            };
+            });
 
             const when = m.sendAt ? new Date(m.sendAt).toLocaleString() : "-";
             const delivered = m.deliveredAt ? new Date(m.deliveredAt).toLocaleString() : null;
@@ -958,72 +1150,157 @@ async function renderListPanel(host) {
                 failed: t("statusFailed")
             }[m.status] || m.status;
 
-            row.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
-                    <div style="flex: 1;">
-                        <div style="font-weight: 700; font-size: 13px; margin-bottom: 4px;">${textShort}</div>
-                        <div style="font-size: 11px; color: rgba(255,255,255,0.65); display: flex; gap: 8px; flex-wrap: wrap;">
-                            <span>⏰ ${when}</span>
-                        </div>
-                        ${delivered ? `
-                            <div style="font-size: 10px; color: #00a884; opacity: 0.85;">
-                                ✓ ${t("labelDeliveredAt")} ${delivered}
-                            </div>
-                        ` : ""}
-                        <div style="margin-top: 6px; font-size: 11px; display: flex; gap: 10px; align-items: center;">
-                            <span style="padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.08); color: ${statusColor}; font-weight: 700;">${statusLabel}</span>
-                            ${m.chatTitle ? `<span style="color: rgba(255,255,255,0.7);">💬 ${m.chatTitle}</span>` : ""}
-                        </div>
-                    </div>
-                    ${m.status === "scheduled" || m.status === "sending" ?
-                        `<div style="display: flex; flex-direction: column; gap: 6px;">
-                            <button class="wa-edit" data-id="${m.id}" style="background: rgba(0,168,132,0.12); color: #00a884; border: 1px solid rgba(0,168,132,0.4); padding: 6px 10px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 11px; transition: background 0.15s, border-color 0.15s;">${t("buttonEdit")}</button>
-                            <button class="wa-cancel" data-id="${m.id}" style="background: rgba(220,38,38,0.12); color: #ef4444; border: 1px solid rgba(220,38,38,0.4); padding: 6px 10px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 11px; transition: background 0.15s, border-color 0.15s;">${t("buttonCancel")}</button>
-                        </div>`
-                        : ""
-                    }
-                </div>
-            `;
-
-            body.appendChild(row);
-
-            row.querySelectorAll("button").forEach((btn) => {
-                btn.addEventListener("mouseover", () => {
-                    if (btn.classList.contains("wa-edit")) {
-                        btn.style.background = "rgba(0,168,132,0.2)";
-                        btn.style.borderColor = "rgba(0,168,132,0.5)";
-                    } else {
-                        btn.style.background = "rgba(220,38,38,0.2)";
-                        btn.style.borderColor = "rgba(220,38,38,0.6)";
-                    }
-                });
-                btn.addEventListener("mouseout", () => {
-                    if (btn.classList.contains("wa-edit")) {
-                        btn.style.background = "rgba(0,168,132,0.12)";
-                        btn.style.borderColor = "rgba(0,168,132,0.4)";
-                    } else {
-                        btn.style.background = "rgba(220,38,38,0.12)";
-                        btn.style.borderColor = "rgba(220,38,38,0.4)";
-                    }
-                });
-                btn.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    const msgId = btn.getAttribute("data-id");
-                    if (confirm(t("confirmCancelSend"))) {
-                        browser.runtime.sendMessage(
-                            { type: "CANCEL_MESSAGE", id: msgId },
-                            (resp) => {
-                                if (resp && resp.ok) {
-                                    showToast(t("toastMessageCancelled"), "success");
-                                    renderListPanel(host);
-                                } else {
-                                    showToast(t("toastErrorWithDetail", [resp?.error || t("errorNoResponse")]), "error");
-                                }
-                            }
-                        );
-                    }
-                });
+            const rowLayout = document.createElement("div");
+            setStyles(rowLayout, {
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: "8px"
             });
+
+            const leftCol = document.createElement("div");
+            setStyles(leftCol, { flex: "1" });
+
+            const messageTitle = document.createElement("div");
+            messageTitle.textContent = textShort;
+            setStyles(messageTitle, { fontWeight: "700", fontSize: "13px", marginBottom: "4px" });
+
+            const metaLine = document.createElement("div");
+            setStyles(metaLine, {
+                fontSize: "11px",
+                color: "rgba(255,255,255,0.65)",
+                display: "flex",
+                gap: "8px",
+                flexWrap: "wrap"
+            });
+            const whenSpan = document.createElement("span");
+            whenSpan.textContent = `⏰ ${when}`;
+            metaLine.appendChild(whenSpan);
+
+            leftCol.appendChild(messageTitle);
+            leftCol.appendChild(metaLine);
+
+            if (delivered) {
+                const deliveredDiv = document.createElement("div");
+                deliveredDiv.textContent = `✓ ${t("labelDeliveredAt")} ${delivered}`;
+                setStyles(deliveredDiv, { fontSize: "10px", color: "#00a884", opacity: "0.85" });
+                leftCol.appendChild(deliveredDiv);
+            }
+
+            const statusLine = document.createElement("div");
+            setStyles(statusLine, {
+                marginTop: "6px",
+                fontSize: "11px",
+                display: "flex",
+                gap: "10px",
+                alignItems: "center"
+            });
+            const statusBadge = document.createElement("span");
+            statusBadge.textContent = statusLabel;
+            setStyles(statusBadge, {
+                padding: "2px 8px",
+                borderRadius: "999px",
+                background: "rgba(255,255,255,0.08)",
+                color: statusColor,
+                fontWeight: "700"
+            });
+            statusLine.appendChild(statusBadge);
+
+            if (m.chatTitle) {
+                const chatSpan = document.createElement("span");
+                chatSpan.textContent = `💬 ${m.chatTitle}`;
+                setStyles(chatSpan, { color: "rgba(255,255,255,0.7)" });
+                statusLine.appendChild(chatSpan);
+            }
+
+            leftCol.appendChild(statusLine);
+            rowLayout.appendChild(leftCol);
+
+            if (m.status === "scheduled" || m.status === "sending") {
+                const actionCol = document.createElement("div");
+                setStyles(actionCol, { display: "flex", flexDirection: "column", gap: "6px" });
+
+                const editBtn = document.createElement("button");
+                editBtn.className = "wa-edit";
+                editBtn.dataset.id = m.id;
+                editBtn.textContent = t("buttonEdit");
+                setStyles(editBtn, {
+                    background: "rgba(0,168,132,0.12)",
+                    color: "#00a884",
+                    border: "1px solid rgba(0,168,132,0.4)",
+                    padding: "6px 10px",
+                    borderRadius: "6px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    fontSize: "11px",
+                    transition: "background 0.15s, border-color 0.15s"
+                });
+
+                const cancelBtn = document.createElement("button");
+                cancelBtn.className = "wa-cancel";
+                cancelBtn.dataset.id = m.id;
+                cancelBtn.textContent = t("buttonCancel");
+                setStyles(cancelBtn, {
+                    background: "rgba(220,38,38,0.12)",
+                    color: "#ef4444",
+                    border: "1px solid rgba(220,38,38,0.4)",
+                    padding: "6px 10px",
+                    borderRadius: "6px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    fontSize: "11px",
+                    transition: "background 0.15s, border-color 0.15s"
+                });
+
+                [editBtn, cancelBtn].forEach((btn) => {
+                    btn.addEventListener("mouseover", () => {
+                        if (btn.classList.contains("wa-edit")) {
+                            btn.style.background = "rgba(0,168,132,0.2)";
+                            btn.style.borderColor = "rgba(0,168,132,0.5)";
+                        } else {
+                            btn.style.background = "rgba(220,38,38,0.2)";
+                            btn.style.borderColor = "rgba(220,38,38,0.6)";
+                        }
+                    });
+                    btn.addEventListener("mouseout", () => {
+                        if (btn.classList.contains("wa-edit")) {
+                            btn.style.background = "rgba(0,168,132,0.12)";
+                            btn.style.borderColor = "rgba(0,168,132,0.4)";
+                        } else {
+                            btn.style.background = "rgba(220,38,38,0.12)";
+                            btn.style.borderColor = "rgba(220,38,38,0.4)";
+                        }
+                    });
+                    btn.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        const msgId = btn.getAttribute("data-id");
+                        if (btn.classList.contains("wa-edit")) {
+                            openEditDialog(msgId, m, host);
+                            return;
+                        }
+                        if (confirm(t("confirmCancelSend"))) {
+                            browser.runtime.sendMessage(
+                                { type: "CANCEL_MESSAGE", id: msgId },
+                                (resp) => {
+                                    if (resp && resp.ok) {
+                                        showToast(t("toastMessageCancelled"), "success");
+                                        renderListPanel(host);
+                                    } else {
+                                        showToast(t("toastErrorWithDetail", [resp?.error || t("errorNoResponse")]), "error");
+                                    }
+                                }
+                            );
+                        }
+                    });
+                });
+
+                actionCol.appendChild(editBtn);
+                actionCol.appendChild(cancelBtn);
+                rowLayout.appendChild(actionCol);
+            }
+
+            row.appendChild(rowLayout);
+            body.appendChild(row);
         });
     });
 }
@@ -1054,55 +1331,202 @@ function renderScheduleView(root) {
     const labelAtField = t("labelScheduleAtField") || "Fecha y hora";
     const chatTitle = getActiveChatTitle() || t("labelChatUnknown");
 
-    root.innerHTML = `
-        <div style="background: rgba(0, 168, 132, 0.08); border-left: 3px solid #00a884; padding: 8px 10px; border-radius: 8px; font-size: 12px;">
-            <div style="font-weight: 600; font-size: 11px; color: rgba(233,237,239,0.85); letter-spacing: 0.1px;">${t("labelCurrentChat")}</div>
-            <div style="font-weight: 600; color: #e9edef; margin-top: 2px;">${chatTitle}</div>
-        </div>
+    clearElement(root);
 
-        <div>
-            <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${t("labelMessage")}</label>
-            <textarea id="wa-msg" placeholder="${t("placeholderMessage")}" style="width: 100%; height: 80px; resize: vertical; border-radius: 8px;"></textarea>
-            <div style="font-size: 11px; color: rgba(241,241,242,0.65); text-align: right; margin-top: 4px;"><span id="wa-char-count">0</span> / 4096</div>
-        </div>
+    const chatBox = document.createElement("div");
+    setStyles(chatBox, {
+        background: "rgba(0, 168, 132, 0.08)",
+        borderLeft: "3px solid #00a884",
+        padding: "8px 10px",
+        borderRadius: "8px",
+        fontSize: "12px"
+    });
+    const chatLabel = document.createElement("div");
+    chatLabel.textContent = t("labelCurrentChat");
+    setStyles(chatLabel, {
+        fontWeight: "600",
+        fontSize: "11px",
+        color: "rgba(233,237,239,0.85)",
+        letterSpacing: "0.1px"
+    });
+    const chatName = document.createElement("div");
+    chatName.textContent = chatTitle;
+    setStyles(chatName, { fontWeight: "600", color: "#e9edef", marginTop: "2px" });
+    chatBox.appendChild(chatLabel);
+    chatBox.appendChild(chatName);
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div style="grid-column: span 2; display: flex; gap: 10px; align-items: center;">
-                <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
-                    <input id="wa-mode-relative" type="radio" name="wa-mode" value="relative" checked style="width: 14px; height: 14px;">
-                    <span>${labelAfter}</span>
-                </label>
-                <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
-                    <input id="wa-mode-datetime" type="radio" name="wa-mode" value="datetime" style="width: 14px; height: 14px;">
-                    <span>${labelAt}</span>
-                </label>
-            </div>
-            <div>
-                <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${t("labelHours")}</label>
-                <input id="wa-hours" type="number" min="0" max="999" value="0" style="width: 100%; padding: 8px 10px; border-radius: 6px;">
-            </div>
-            <div>
-                <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${t("labelMinutes")}</label>
-                <input id="wa-mins" type="number" min="0" max="59" value="0" style="width: 100%; padding: 8px 10px; border-radius: 6px;">
-            </div>
-            <div style="grid-column: span 2;">
-                <label style="display: block; font-size: 11px; opacity: 0.8; margin-bottom: 4px; font-weight: 600; letter-spacing: 0.1px;">${labelAtField}</label>
-                <input id="wa-datetime" type="datetime-local" style="width: 100%; padding: 8px 10px; border-radius: 6px;">
-            </div>
-        </div>
+    const messageWrapper = document.createElement("div");
+    const msgLabel = document.createElement("label");
+    msgLabel.textContent = t("labelMessage");
+    setStyles(msgLabel, {
+        display: "block",
+        fontSize: "11px",
+        opacity: "0.8",
+        marginBottom: "4px",
+        fontWeight: "600",
+        letterSpacing: "0.1px"
+    });
+    const msgInput = document.createElement("textarea");
+    msgInput.id = "wa-msg";
+    msgInput.placeholder = t("placeholderMessage");
+    setStyles(msgInput, { width: "100%", height: "80px", resize: "vertical", borderRadius: "8px" });
+    const counter = document.createElement("div");
+    setStyles(counter, {
+        fontSize: "11px",
+        color: "rgba(241,241,242,0.65)",
+        textAlign: "right",
+        marginTop: "4px"
+    });
+    const charCount = document.createElement("span");
+    charCount.id = "wa-char-count";
+    charCount.textContent = "0";
+    counter.appendChild(charCount);
+    counter.appendChild(document.createTextNode(" / 4096"));
+    messageWrapper.appendChild(msgLabel);
+    messageWrapper.appendChild(msgInput);
+    messageWrapper.appendChild(counter);
 
-        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
-            <button id="wa-list" style="background: transparent; border: 1px solid rgba(134,150,160,0.5); color: #e9edef; border-radius: 6px; padding: 8px 12px; font-weight: 600; cursor: pointer; font-size: 12px; transition: border-color 0.15s, background 0.15s;">
-                ${t("buttonList")}
-            </button>
-            <button id="wa-schedule" style="background: #00a884; color: #111b21; border: none; border-radius: 6px; padding: 8px 12px; font-weight: 700; cursor: pointer; font-size: 12px; transition: background 0.15s, box-shadow 0.15s;">
-                ${t("buttonSchedule")}
-            </button>
-        </div>
-    `;
+    const grid = document.createElement("div");
+    setStyles(grid, { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" });
 
-    const msgInput = document.getElementById("wa-msg");
-    const charCount = document.getElementById("wa-char-count");
+    const radioRow = document.createElement("div");
+    setStyles(radioRow, { gridColumn: "span 2", display: "flex", gap: "10px", alignItems: "center" });
+
+    const relativeLabel = document.createElement("label");
+    setStyles(relativeLabel, { display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", cursor: "pointer" });
+    const modeRelative = document.createElement("input");
+    modeRelative.id = "wa-mode-relative";
+    modeRelative.type = "radio";
+    modeRelative.name = "wa-mode";
+    modeRelative.value = "relative";
+    modeRelative.checked = true;
+    setStyles(modeRelative, { width: "14px", height: "14px" });
+    const relativeText = document.createElement("span");
+    relativeText.textContent = labelAfter;
+    relativeLabel.appendChild(modeRelative);
+    relativeLabel.appendChild(relativeText);
+
+    const datetimeLabel = document.createElement("label");
+    setStyles(datetimeLabel, { display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", cursor: "pointer" });
+    const modeDatetime = document.createElement("input");
+    modeDatetime.id = "wa-mode-datetime";
+    modeDatetime.type = "radio";
+    modeDatetime.name = "wa-mode";
+    modeDatetime.value = "datetime";
+    setStyles(modeDatetime, { width: "14px", height: "14px" });
+    const datetimeText = document.createElement("span");
+    datetimeText.textContent = labelAt;
+    datetimeLabel.appendChild(modeDatetime);
+    datetimeLabel.appendChild(datetimeText);
+
+    radioRow.appendChild(relativeLabel);
+    radioRow.appendChild(datetimeLabel);
+
+    const hoursWrapper = document.createElement("div");
+    const hoursLabel = document.createElement("label");
+    hoursLabel.textContent = t("labelHours");
+    setStyles(hoursLabel, {
+        display: "block",
+        fontSize: "11px",
+        opacity: "0.8",
+        marginBottom: "4px",
+        fontWeight: "600",
+        letterSpacing: "0.1px"
+    });
+    const hoursInput = document.createElement("input");
+    hoursInput.id = "wa-hours";
+    hoursInput.type = "number";
+    hoursInput.min = "0";
+    hoursInput.max = "999";
+    hoursInput.value = "0";
+    setStyles(hoursInput, { width: "100%", padding: "8px 10px", borderRadius: "6px" });
+    hoursWrapper.appendChild(hoursLabel);
+    hoursWrapper.appendChild(hoursInput);
+
+    const minsWrapper = document.createElement("div");
+    const minsLabel = document.createElement("label");
+    minsLabel.textContent = t("labelMinutes");
+    setStyles(minsLabel, {
+        display: "block",
+        fontSize: "11px",
+        opacity: "0.8",
+        marginBottom: "4px",
+        fontWeight: "600",
+        letterSpacing: "0.1px"
+    });
+    const minsInput = document.createElement("input");
+    minsInput.id = "wa-mins";
+    minsInput.type = "number";
+    minsInput.min = "0";
+    minsInput.max = "59";
+    minsInput.value = "0";
+    setStyles(minsInput, { width: "100%", padding: "8px 10px", borderRadius: "6px" });
+    minsWrapper.appendChild(minsLabel);
+    minsWrapper.appendChild(minsInput);
+
+    const dateWrapper = document.createElement("div");
+    setStyles(dateWrapper, { gridColumn: "span 2" });
+    const dateLabel = document.createElement("label");
+    dateLabel.textContent = labelAtField;
+    setStyles(dateLabel, {
+        display: "block",
+        fontSize: "11px",
+        opacity: "0.8",
+        marginBottom: "4px",
+        fontWeight: "600",
+        letterSpacing: "0.1px"
+    });
+    const datetimeInput = document.createElement("input");
+    datetimeInput.id = "wa-datetime";
+    datetimeInput.type = "datetime-local";
+    setStyles(datetimeInput, { width: "100%", padding: "8px 10px", borderRadius: "6px" });
+    dateWrapper.appendChild(dateLabel);
+    dateWrapper.appendChild(datetimeInput);
+
+    grid.appendChild(radioRow);
+    grid.appendChild(hoursWrapper);
+    grid.appendChild(minsWrapper);
+    grid.appendChild(dateWrapper);
+
+    const actions = document.createElement("div");
+    setStyles(actions, { display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "4px" });
+    const listBtn = document.createElement("button");
+    listBtn.id = "wa-list";
+    listBtn.textContent = t("buttonList");
+    setStyles(listBtn, {
+        background: "transparent",
+        border: "1px solid rgba(134,150,160,0.5)",
+        color: "#e9edef",
+        borderRadius: "6px",
+        padding: "8px 12px",
+        fontWeight: "600",
+        cursor: "pointer",
+        fontSize: "12px",
+        transition: "border-color 0.15s, background 0.15s"
+    });
+    const scheduleBtn = document.createElement("button");
+    scheduleBtn.id = "wa-schedule";
+    scheduleBtn.textContent = t("buttonSchedule");
+    setStyles(scheduleBtn, {
+        background: "#00a884",
+        color: "#111b21",
+        border: "none",
+        borderRadius: "6px",
+        padding: "8px 12px",
+        fontWeight: "700",
+        cursor: "pointer",
+        fontSize: "12px",
+        transition: "background 0.15s, box-shadow 0.15s"
+    });
+
+    actions.appendChild(listBtn);
+    actions.appendChild(scheduleBtn);
+
+    root.appendChild(chatBox);
+    root.appendChild(messageWrapper);
+    root.appendChild(grid);
+    root.appendChild(actions);
+
     msgInput.addEventListener("input", () => {
         charCount.textContent = msgInput.value.length;
         if (msgInput.value.length > 4096) {
@@ -1114,7 +1538,6 @@ function renderScheduleView(root) {
         }
     });
 
-    const scheduleBtn = document.getElementById("wa-schedule");
     scheduleBtn.onmouseover = () => {
         scheduleBtn.style.background = "#029273";
         scheduleBtn.style.boxShadow = "0 2px 8px rgba(0,0,0,0.35)";
@@ -1124,7 +1547,6 @@ function renderScheduleView(root) {
         scheduleBtn.style.boxShadow = "none";
     };
 
-    const listBtn = document.getElementById("wa-list");
     listBtn.onmouseover = () => {
         listBtn.style.background = "rgba(134,150,160,0.1)";
         listBtn.style.borderColor = "rgba(134,150,160,0.8)";
@@ -1142,26 +1564,20 @@ function renderScheduleView(root) {
         updateHeaderForMode();
     };
 
-    const modeRelative = document.getElementById("wa-mode-relative");
-    const modeDatetime = document.getElementById("wa-mode-datetime");
-    const hoursInput = document.getElementById("wa-hours");
-    const minsInput = document.getElementById("wa-mins");
-    const datetimeInput = document.getElementById("wa-datetime");
-
-    function updateModeUI() {
+    const updateModeUI = () => {
         const isRelative = modeRelative.checked;
         hoursInput.disabled = !isRelative;
         minsInput.disabled = !isRelative;
         datetimeInput.disabled = isRelative;
         datetimeInput.style.opacity = isRelative ? 0.5 : 1;
-    }
+    };
 
     modeRelative.addEventListener("change", updateModeUI);
     modeDatetime.addEventListener("change", updateModeUI);
     updateModeUI();
 
-    document.getElementById("wa-schedule").onclick = () => {
-        const text = document.getElementById("wa-msg").value.trim();
+    scheduleBtn.onclick = () => {
+        const text = msgInput.value.trim();
         const hours = parseInt(hoursInput.value || "0", 10);
         const mins = parseInt(minsInput.value || "0", 10);
 
@@ -1192,7 +1608,7 @@ function renderScheduleView(root) {
             const sendAt = dtValue ? new Date(dtValue).getTime() : NaN;
             delayMs = sendAt - Date.now();
 
-            if (!dtValue || isNaN(sendAt) || delayMs <= 0) {
+            if (!dtValue || Number.isNaN(sendAt) || delayMs <= 0) {
                 showToast("Selecciona una fecha/hora futura", "warning");
                 return;
             }
@@ -1200,7 +1616,7 @@ function renderScheduleView(root) {
             totalMins = Math.ceil(delayMs / (60 * 1000));
         }
 
-        const chatTitle = getActiveChatTitle();
+        const chatTitleCurrent = getActiveChatTitle();
         const avatarKey = getActiveChatAvatarKey();
 
         browser.runtime.sendMessage(
@@ -1208,7 +1624,7 @@ function renderScheduleView(root) {
                 type: "SCHEDULE_MESSAGE",
                 text,
                 delayMs,
-                chatTitle,
+                chatTitle: chatTitleCurrent,
                 avatarKey
             },
             (resp) => {
@@ -1230,12 +1646,13 @@ function renderScheduleView(root) {
     setTimeout(() => msgInput.focus(), 100);
 }
 
+
 function renderListView(root) {
     const headerTitle = document.getElementById("wa-scheduler-title");
     if (headerTitle) headerTitle.textContent = t("listTitle") || "Scheduled messages";
 
     if (root) {
-        root.innerHTML = "";
+        clearElement(root);
         renderListPanel(root);
     }
 }
@@ -1251,21 +1668,20 @@ async function createSchedulerUI() {
 
     const panel = document.createElement("div");
     panel.id = "wa-scheduler-panel";
-    panel.style.cssText = `
-        position: fixed;
-        bottom: 84px;
-        right: 80px;
-        z-index: 99999;
-        color: #e9edef;
-        font-size: 12px;
-        width: 340px;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        animation: slideUp 0.25s ease-out;
-    `;
+    setStyles(panel, {
+        position: "fixed",
+        bottom: "84px",
+        right: "80px",
+        zIndex: "99999",
+        color: "#e9edef",
+        fontSize: "12px",
+        width: "340px",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif",
+        animation: "slideUp 0.25s ease-out"
+    });
 
-    panel.innerHTML = `
-        <style>
-            @keyframes slideUp {
+    const styleEl = document.createElement("style");
+    styleEl.textContent = `@keyframes slideUp {
                 from {
                     transform: translateY(16px);
                     opacity: 0;
@@ -1276,50 +1692,150 @@ async function createSchedulerUI() {
                 }
             }
             #wa-scheduler-panel input,
-            #wa-scheduler-panel textarea {                background: #202c33;                border: 1px solid rgba(134,150,160,0.3);                color: #e9edef;                border-radius: 8px;                padding: 9px 10px;                font-size: 13px;                font-family: inherit;                transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;                box-sizing: border-box;            }
+            #wa-scheduler-panel textarea {
+                background: #202c33;
+                border: 1px solid rgba(134,150,160,0.3);
+                color: #e9edef;
+                border-radius: 8px;
+                padding: 9px 10px;
+                font-size: 13px;
+                font-family: inherit;
+                transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+                box-sizing: border-box;
+            }
             #wa-scheduler-panel input:focus,
-            #wa-scheduler-panel textarea:focus {                background: #202c33;                border-color: #00a884;                outline: none;                box-shadow: 0 0 0 1px rgba(0, 168, 132, 0.4);            }
+            #wa-scheduler-panel textarea:focus {
+                background: #202c33;
+                border-color: #00a884;
+                outline: none;
+                box-shadow: 0 0 0 1px rgba(0, 168, 132, 0.4);
+            }
             #wa-scheduler-panel input::placeholder,
-            #wa-scheduler-panel textarea::placeholder {                color: rgba(233, 237, 239, 0.6);            }
+            #wa-scheduler-panel textarea::placeholder {
+                color: rgba(233, 237, 239, 0.6);
+            }
             #wa-scheduler-panel input[type=number]::-webkit-inner-spin-button,
-            #wa-scheduler-panel input[type=number]::-webkit-outer-spin-button {                -webkit-appearance: none;                margin: 0;            }
-            #wa-scheduler-panel input[type=number] {                -moz-appearance: textfield;            }
-        </style>
+            #wa-scheduler-panel input[type=number]::-webkit-outer-spin-button {
+                -webkit-appearance: none;
+                margin: 0;
+            }
+            #wa-scheduler-panel input[type=number] {
+                -moz-appearance: textfield;
+            }`;
 
-        <div id="wa-scheduler-inner" style="background: #202c33; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.35); overflow: hidden;">
-            <div id="wa-scheduler-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #202c33; border-bottom: 1px solid rgba(255,255,255,0.08); gap: 8px;">
-                <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
-                    <button id="wa-scheduler-back" style="width: 28px; height: 28px; border-radius: 14px; border: none; background: transparent; color: #e9edef; cursor: pointer; transition: background 0.15s; display: none; align-items: center; justify-content: center; font-size: 14px;" onmouseover="this.style.background='rgba(134,150,160,0.16)'" onmouseout="this.style.background='transparent'">←</button>
-                    <span style="font-size: 15px; color: #00a884;">🗓️</span>
-                    <span id="wa-scheduler-title" style="font-weight: 700; font-size: 13px;">${t("panelTitleSchedule")}</span>
-                </div>
-                <button id="wa-close" style="width: 32px; height: 32px; border-radius: 16px; border: none; background: transparent; color: #e9edef; cursor: pointer; transition: background 0.15s; display: flex; align-items: center; justify-content: center; font-size: 16px;" onmouseover="this.style.background='rgba(134,150,160,0.16)'" onmouseout="this.style.background='transparent'">✕</button>
-            </div>
+    const inner = document.createElement("div");
+    inner.id = "wa-scheduler-inner";
+    setStyles(inner, {
+        background: "#202c33",
+        border: "1px solid rgba(255,255,255,0.06)",
+        borderRadius: "8px",
+        boxShadow: "0 2px 12px rgba(0,0,0,0.35)",
+        overflow: "hidden"
+    });
 
-            <div id="wa-scheduler-body" style="padding: 12px; display: flex; flex-direction: column; gap: 10px;"></div>
-        </div>
-    `;
+    const header = document.createElement("div");
+    header.id = "wa-scheduler-header";
+    setStyles(header, {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "10px 12px",
+        background: "#202c33",
+        borderBottom: "1px solid rgba(255,255,255,0.08)",
+        gap: "8px"
+    });
+
+    const leftHeader = document.createElement("div");
+    setStyles(leftHeader, { display: "flex", alignItems: "center", gap: "8px", flex: "1" });
+
+    const backBtn = document.createElement("button");
+    backBtn.id = "wa-scheduler-back";
+    backBtn.textContent = "←";
+    setStyles(backBtn, {
+        width: "28px",
+        height: "28px",
+        borderRadius: "14px",
+        border: "none",
+        background: "transparent",
+        color: "#e9edef",
+        cursor: "pointer",
+        transition: "background 0.15s",
+        display: "none",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "14px"
+    });
+    backBtn.addEventListener("mouseover", () => {
+        backBtn.style.background = "rgba(134,150,160,0.16)";
+    });
+    backBtn.addEventListener("mouseout", () => {
+        backBtn.style.background = "transparent";
+    });
+
+    const icon = document.createElement("span");
+    icon.textContent = "🗓️";
+    setStyles(icon, { fontSize: "15px", color: "#00a884" });
+
+    const title = document.createElement("span");
+    title.id = "wa-scheduler-title";
+    title.textContent = t("panelTitleSchedule");
+    setStyles(title, { fontWeight: "700", fontSize: "13px" });
+
+    leftHeader.appendChild(backBtn);
+    leftHeader.appendChild(icon);
+    leftHeader.appendChild(title);
+
+    const closeBtn = document.createElement("button");
+    closeBtn.id = "wa-close";
+    closeBtn.textContent = "✕";
+    setStyles(closeBtn, {
+        width: "32px",
+        height: "32px",
+        borderRadius: "16px",
+        border: "none",
+        background: "transparent",
+        color: "#e9edef",
+        cursor: "pointer",
+        transition: "background 0.15s",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "16px"
+    });
+    closeBtn.addEventListener("mouseover", () => {
+        closeBtn.style.background = "rgba(134,150,160,0.16)";
+    });
+    closeBtn.addEventListener("mouseout", () => {
+        closeBtn.style.background = "transparent";
+    });
+
+    header.appendChild(leftHeader);
+    header.appendChild(closeBtn);
+
+    const body = document.createElement("div");
+    body.id = "wa-scheduler-body";
+    setStyles(body, { padding: "12px", display: "flex", flexDirection: "column", gap: "10px" });
+
+    inner.appendChild(header);
+    inner.appendChild(body);
+    panel.appendChild(styleEl);
+    panel.appendChild(inner);
 
     document.body.appendChild(panel);
 
-    const closeBtn = document.getElementById("wa-close");
     closeBtn.onclick = () => panel.remove();
 
-    const backBtn = document.getElementById("wa-scheduler-back");
-    if (backBtn) {
-        backBtn.addEventListener("click", () => {
-            waSchedulerMode = "schedule";
-            const body = document.getElementById("wa-scheduler-body");
-            if (body) renderScheduleView(body);
-            updateHeaderForMode();
-        });
-    }
+    backBtn.addEventListener("click", () => {
+        waSchedulerMode = "schedule";
+        renderScheduleView(body);
+        updateHeaderForMode();
+    });
 
     waSchedulerMode = "schedule";
-    const body = panel.querySelector("#wa-scheduler-body");
     renderScheduleView(body);
     updateHeaderForMode();
 }
+
 
 // -------------------------
 // Floating button
@@ -1336,64 +1852,69 @@ async function createFloatingButton() {
 
     const btn = document.createElement("button");
     btn.id = "wa-scheduler-button";
-    btn.innerHTML = `
-        <div class="html-div">
-            <svg
-                class="wa-schedule-icon"
-                viewBox="0 0 24 24"
-                width="20"
-                height="20"
-                aria-hidden="true"
-            >
-                <rect
-                    x="3.5"
-                    y="4.5"
-                    width="17"
-                    height="16"
-                    rx="2.5"
-                    ry="2.5"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                />
-                <line
-                    x1="3.5"
-                    y1="8.5"
-                    x2="20.5"
-                    y2="8.5"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                    stroke-linecap="round"
-                />
-                <line
-                    x1="9"
-                    y1="3"
-                    x2="9"
-                    y2="6.5"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                    stroke-linecap="round"
-                />
-                <line
-                    x1="15"
-                    y1="3"
-                    x2="15"
-                    y2="6.5"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                    stroke-linecap="round"
-                />
-                <polyline
-                    points="9 13 11.3 15.3 15.2 11.8"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                />
-            </svg>
-        </div>
-    `;
+    const iconWrap = document.createElement("div");
+    iconWrap.className = "html-div";
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("class", "wa-schedule-icon");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", "20");
+    svg.setAttribute("height", "20");
+    svg.setAttribute("aria-hidden", "true");
+
+    const rect = document.createElementNS(svgNS, "rect");
+    rect.setAttribute("x", "3.5");
+    rect.setAttribute("y", "4.5");
+    rect.setAttribute("width", "17");
+    rect.setAttribute("height", "16");
+    rect.setAttribute("rx", "2.5");
+    rect.setAttribute("ry", "2.5");
+    rect.setAttribute("fill", "none");
+    rect.setAttribute("stroke", "currentColor");
+    rect.setAttribute("stroke-width", "1.8");
+    svg.appendChild(rect);
+
+    const line1 = document.createElementNS(svgNS, "line");
+    line1.setAttribute("x1", "3.5");
+    line1.setAttribute("y1", "8.5");
+    line1.setAttribute("x2", "20.5");
+    line1.setAttribute("y2", "8.5");
+    line1.setAttribute("stroke", "currentColor");
+    line1.setAttribute("stroke-width", "1.8");
+    line1.setAttribute("stroke-linecap", "round");
+    svg.appendChild(line1);
+
+    const line2 = document.createElementNS(svgNS, "line");
+    line2.setAttribute("x1", "9");
+    line2.setAttribute("y1", "3");
+    line2.setAttribute("x2", "9");
+    line2.setAttribute("y2", "6.5");
+    line2.setAttribute("stroke", "currentColor");
+    line2.setAttribute("stroke-width", "1.8");
+    line2.setAttribute("stroke-linecap", "round");
+    svg.appendChild(line2);
+
+    const line3 = document.createElementNS(svgNS, "line");
+    line3.setAttribute("x1", "15");
+    line3.setAttribute("y1", "3");
+    line3.setAttribute("x2", "15");
+    line3.setAttribute("y2", "6.5");
+    line3.setAttribute("stroke", "currentColor");
+    line3.setAttribute("stroke-width", "1.8");
+    line3.setAttribute("stroke-linecap", "round");
+    svg.appendChild(line3);
+
+    const polyline = document.createElementNS(svgNS, "polyline");
+    polyline.setAttribute("points", "9 13 11.3 15.3 15.2 11.8");
+    polyline.setAttribute("fill", "none");
+    polyline.setAttribute("stroke", "currentColor");
+    polyline.setAttribute("stroke-width", "1.8");
+    polyline.setAttribute("stroke-linecap", "round");
+    polyline.setAttribute("stroke-linejoin", "round");
+    svg.appendChild(polyline);
+
+    iconWrap.appendChild(svg);
+    btn.appendChild(iconWrap);
     btn.title = t("buttonTooltip");
     btn.style.cssText = `
         position: fixed;

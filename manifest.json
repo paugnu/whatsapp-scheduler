@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "WhatsApp Message Scheduler",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Schedule messages in WhatsApp Web.",
   "default_locale": "en",
   "icons": {
@@ -17,7 +17,9 @@
     "https://web.whatsapp.com/*"
   ],
   "background": {
-    "scripts": ["background.js"],
+    "scripts": [
+      "background.js"
+    ],
     "persistent": true
   },
   "content_scripts": [
@@ -25,7 +27,9 @@
       "matches": [
         "https://web.whatsapp.com/*"
       ],
-      "js": ["content-script.js"],
+      "js": [
+        "content-script.js"
+      ],
       "run_at": "document_idle"
     }
   ],

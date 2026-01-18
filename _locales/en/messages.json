@@ -160,5 +160,8 @@
   },
   "listSubtitle": {
     "message": "Delivery history"
+  },
+  "toastSelectFutureDateTime": {
+    "message": "Select a future date/time"
   }
 }

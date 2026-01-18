@@ -160,5 +160,8 @@
   },
   "listSubtitle": {
     "message": "Cronologia invii"
+  },
+  "toastSelectFutureDateTime": {
+    "message": "Select a future date/time"
   }
 }

@@ -66,8 +66,8 @@ async function loadLocaleMessages() {
     const navigatorLanguages = Array.isArray(navigator.languages)
         ? navigator.languages
         : navigator.language
-          ? [navigator.language]
-          : [];
+            ? [navigator.language]
+            : [];
 
     const candidates = [...acceptLanguages, ...navigatorLanguages, currentLocale, "en"];
 
@@ -407,7 +407,7 @@ async function searchAndOpenChat(title, avatarKey) {
 function showToast(msg, type = "info", duration = 3000) {
     const toast = document.createElement("div");
     toast.id = `wa-toast-${Date.now()}`;
-    
+
     const bgColor = {
         success: "#25D366",
         error: "#dc2626",
@@ -477,32 +477,81 @@ startChatObserver();
 // Write and send a message
 // -------------------------
 
-function sendMessageInActiveChat(text) {
+async function sendMessageInActiveChat(text) {
+    // Find the input with multiple fallback selectors
     const input =
         document.querySelector('footer [contenteditable="true"]') ||
-        document.querySelector('[contenteditable="true"][data-tab="10"]');
+        document.querySelector('.lexical-rich-text-input [contenteditable="true"]') ||
+        document.querySelector('[contenteditable="true"][data-lexical-editor="true"]') ||
+        document.querySelector('[contenteditable="true"][data-tab="10"]') ||
+        document.querySelector('#main footer [contenteditable="true"]');
 
     if (!input) throw new Error(t("errorNoComposer"));
     if (text.length > 4096) throw new Error(t("errorTextTooLong"));
 
+    // Focus the input
     input.focus();
-    document.execCommand("selectAll", false, null);
-    document.execCommand("delete", false, null);
-    document.execCommand("insertText", false, text);
 
-    setTimeout(() => {
-        const btn =
-            document.querySelector('[data-icon="send"]')?.closest("button") ||
-            document.querySelector('button[aria-label="Send"]');
+    // Clear existing content
+    input.textContent = "";
 
-        if (btn) {
-            superClick(btn);
-        } else {
-            input.dispatchEvent(
-                new KeyboardEvent("keydown", { key: "Enter", keyCode: 13, bubbles: true })
-            );
+    // Try modern clipboard API first
+    try {
+        await navigator.clipboard.writeText(text);
+        document.execCommand("paste");
+    } catch (e) {
+        // Fallback to direct text insertion
+        console.log("[WA Scheduler] Clipboard API failed, using fallback:", e);
+
+        // Try execCommand as fallback
+        const success = document.execCommand("insertText", false, text);
+        if (!success) {
+            // Last resort: direct DOM manipulation
+            input.textContent = text;
+
+            // Trigger input events to notify React
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+
+            // Also try InputEvent for newer React versions
+            const inputEvent = new InputEvent("input", {
+                bubbles: true,
+                cancelable: true,
+                data: text,
+                inputType: "insertText"
+            });
+            input.dispatchEvent(inputEvent);
         }
-    }, 400);
+    }
+
+    // Wait a bit for WhatsApp to process the text
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Find and click the send button with multiple fallbacks
+    const btn =
+        document.querySelector('footer button[aria-label*="Send"]') ||
+        document.querySelector('footer button[data-tab="11"]') ||
+        document.querySelector('[data-icon="send"]')?.closest("button") ||
+        document.querySelector('footer button[type="button"]:has(span[data-icon="send"])') ||
+        document.querySelector('footer span[data-icon="send"]')?.closest("button");
+
+    if (btn) {
+        superClick(btn);
+        console.log("[WA Scheduler] Send button clicked");
+    } else {
+        // Fallback: try Enter key
+        console.log("[WA Scheduler] Send button not found, trying Enter key");
+        input.dispatchEvent(
+            new KeyboardEvent("keydown", {
+                key: "Enter",
+                code: "Enter",
+                keyCode: 13,
+                which: 13,
+                bubbles: true,
+                cancelable: true
+            })
+        );
+    }
 }
 
 // -------------------------
@@ -516,7 +565,7 @@ async function sendToScheduledChat(id, text, chatTitle, avatarKey) {
 
     if (!chatTitle) {
         try {
-            sendMessageInActiveChat(text);
+            await sendMessageInActiveChat(text);
             browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: true });
         } catch (e) {
             browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: false, error: String(e) });
@@ -531,7 +580,7 @@ async function sendToScheduledChat(id, text, chatTitle, avatarKey) {
     if (current && namesMatch(chatTitle, current) && avatarMatches) {
         console.log("Chat correcto ya abierto.");
         try {
-            sendMessageInActiveChat(text);
+            await sendMessageInActiveChat(text);
             browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: true });
         } catch (e) {
             browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: false, error: String(e) });
@@ -559,9 +608,9 @@ async function sendToScheduledChat(id, text, chatTitle, avatarKey) {
 
         if (activeNow && namesMatch(chatTitle, activeNow)) {
             clearInterval(checkInterval);
-            setTimeout(() => {
+            setTimeout(async () => {
                 try {
-                    sendMessageInActiveChat(text);
+                    await sendMessageInActiveChat(text);
                     browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: true });
                 } catch (e) {
                     browser.runtime.sendMessage({ type: "DELIVERY_REPORT", id, ok: false, error: String(e) });
@@ -904,7 +953,7 @@ async function openEditDialog(msgId, msg, host) {
         setTimeout(() => modal.remove(), 300);
     });
 
-    saveBtn.addEventListener("click", () => {
+    saveBtn.addEventListener("click", async () => {
         const newText = textInput.value.trim();
         const newHours = parseInt(hoursInput.value || "0", 10);
         const newMins = parseInt(minsInput.value || "0", 10);
@@ -927,27 +976,29 @@ async function openEditDialog(msgId, msg, host) {
 
         const newDelayMs = newTotalMins * 60 * 1000;
 
-        browser.runtime.sendMessage(
-            {
+        try {
+            const resp = await browser.runtime.sendMessage({
                 type: "EDIT_MESSAGE",
                 id: msgId,
                 text: newText,
                 delayMs: newDelayMs
-            },
-            (resp) => {
-                if (resp && resp.ok) {
-                    showToast(t("toastMessageUpdated"), "success");
-                    modal.style.animation = "slideOut 0.3s ease-in";
-                    setTimeout(() => {
-                        modal.remove();
-                        document.removeEventListener("keydown", escapeHandler);
-                        renderListPanel(host);
-                    }, 300);
-                } else {
-                    showToast(t("toastErrorWithDetail", [resp?.error || t("errorNoResponse")]), "error", 5000);
-                }
+            });
+
+            if (resp && resp.ok) {
+                showToast(t("toastMessageUpdated"), "success");
+                modal.style.animation = "slideOut 0.3s ease-in";
+                setTimeout(() => {
+                    modal.remove();
+                    document.removeEventListener("keydown", escapeHandler);
+                    renderListPanel(host);
+                }, 300);
+            } else {
+                showToast(t("toastErrorWithDetail", [resp?.error || t("errorNoResponse")]), "error", 5000);
             }
-        );
+        } catch (error) {
+            console.error("[WA Scheduler] Error editing message:", error);
+            showToast(t("toastErrorWithDetail", [String(error)]), "error", 5000);
+        }
     });
 
     modal.addEventListener("click", (e) => {
@@ -1098,10 +1149,10 @@ async function renderListPanel(host) {
             const statusColor = m.status === "sent"
                 ? "#00a884"
                 : m.status === "failed"
-                  ? "#dc2626"
-                  : m.status === "sending"
-                    ? "#f59e0b"
-                    : "#53bdeb";
+                    ? "#dc2626"
+                    : m.status === "sending"
+                        ? "#f59e0b"
+                        : "#53bdeb";
 
             setStyles(row, {
                 marginBottom: "10px",
@@ -1255,7 +1306,7 @@ async function renderListPanel(host) {
                             btn.style.borderColor = "rgba(220,38,38,0.4)";
                         }
                     });
-                    btn.addEventListener("click", (e) => {
+                    btn.addEventListener("click", async (e) => {
                         e.stopPropagation();
                         const msgId = btn.getAttribute("data-id");
                         if (btn.classList.contains("wa-edit")) {
@@ -1263,17 +1314,22 @@ async function renderListPanel(host) {
                             return;
                         }
                         if (confirm(t("confirmCancelSend"))) {
-                            browser.runtime.sendMessage(
-                                { type: "CANCEL_MESSAGE", id: msgId },
-                                (resp) => {
-                                    if (resp && resp.ok) {
-                                        showToast(t("toastMessageCancelled"), "success");
-                                        renderListPanel(host);
-                                    } else {
-                                        showToast(t("toastErrorWithDetail", [resp?.error || t("errorNoResponse")]), "error");
-                                    }
+                            try {
+                                const resp = await browser.runtime.sendMessage({
+                                    type: "CANCEL_MESSAGE",
+                                    id: msgId
+                                });
+
+                                if (resp && resp.ok) {
+                                    showToast(t("toastMessageCancelled"), "success");
+                                    renderListPanel(host);
+                                } else {
+                                    showToast(t("toastErrorWithDetail", [resp?.error || t("errorNoResponse")]), "error");
                                 }
-                            );
+                            } catch (error) {
+                                console.error("[WA Scheduler] Error cancelling message:", error);
+                                showToast(t("toastErrorWithDetail", [String(error)]), "error");
+                            }
                         }
                     });
                 });
@@ -1560,7 +1616,7 @@ function renderScheduleView(root) {
     modeDatetime.addEventListener("change", updateModeUI);
     updateModeUI();
 
-    scheduleBtn.onclick = () => {
+    scheduleBtn.onclick = async () => {
         const text = msgInput.value.trim();
         const hours = parseInt(hoursInput.value || "0", 10);
         const mins = parseInt(minsInput.value || "0", 10);
@@ -1593,7 +1649,7 @@ function renderScheduleView(root) {
             delayMs = sendAt - Date.now();
 
             if (!dtValue || Number.isNaN(sendAt) || delayMs <= 0) {
-                showToast("Selecciona una fecha/hora futura", "warning");
+                showToast(t("toastSelectFutureDateTime"), "warning");
                 return;
             }
 
@@ -1603,28 +1659,30 @@ function renderScheduleView(root) {
         const chatTitleCurrent = getActiveChatTitle();
         const avatarKey = getActiveChatAvatarKey();
 
-        browser.runtime.sendMessage(
-            {
+        try {
+            const resp = await browser.runtime.sendMessage({
                 type: "SCHEDULE_MESSAGE",
                 text,
                 delayMs,
                 chatTitle: chatTitleCurrent,
                 avatarKey
-            },
-            (resp) => {
-                if (resp && resp.ok) {
-                    showToast(t("toastScheduledMinutes", [totalMins]), "success");
-                    msgInput.value = "";
-                    hoursInput.value = "0";
-                    minsInput.value = "0";
-                    datetimeInput.value = "";
-                    charCount.textContent = "0";
-                    setTimeout(() => document.getElementById("wa-scheduler-panel")?.remove(), 500);
-                } else {
-                    showToast(t("toastErrorWithDetail", [resp?.error || t("errorNoResponse")]), "error", 5000);
-                }
+            });
+
+            if (resp && resp.ok) {
+                showToast(t("toastScheduledMinutes", [totalMins]), "success");
+                msgInput.value = "";
+                hoursInput.value = "0";
+                minsInput.value = "0";
+                datetimeInput.value = "";
+                charCount.textContent = "0";
+                setTimeout(() => document.getElementById("wa-scheduler-panel")?.remove(), 500);
+            } else {
+                showToast(t("toastErrorWithDetail", [resp?.error || t("errorNoResponse")]), "error", 5000);
             }
-        );
+        } catch (error) {
+            console.error("[WA Scheduler] Error al programar:", error);
+            showToast(t("toastErrorWithDetail", [String(error)]), "error", 5000);
+        }
     };
 
     setTimeout(() => msgInput.focus(), 100);

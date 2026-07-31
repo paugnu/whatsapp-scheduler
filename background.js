@@ -74,8 +74,6 @@ async function ensureLocaleReady() {
 
 // In-memory state
 let scheduledMessages = {};
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 2000;
 const ALARM_PREFIX = "waScheduler::";
 const WHATSAPP_URL = "https://web.whatsapp.com/";
 const CREATED_TAB_SETTLE_MS = 4000;
@@ -150,6 +148,14 @@ function parseAlarmName(name = "") {
 // -------------------------
 
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (!message || typeof message.type !== "string") return false;
+
+    const senderUrl = sender?.url || sender?.tab?.url || "";
+    if (!senderUrl.startsWith(WHATSAPP_URL)) {
+        console.warn("[BG] Mensaje ignorado desde un origen no autorizado");
+        return false;
+    }
+
     console.log("[BG] Mensaje recibido:", message.type);
 
     if (message.type === "WA_READY" && sender?.tab?.id) {
@@ -161,12 +167,14 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // SCHEDULE_MESSAGE: schedule a new message
     if (message.type === "SCHEDULE_MESSAGE") {
         try {
-            const id = "msg_" + Date.now();
-            const when = Date.now() + message.delayMs;
+            const textValidation = SchedulerUtils.validateMessageText(message.text);
+            if (!textValidation.ok) throw new Error(textValidation.error);
 
-            if (message.text.length > 4096) {
-                throw new Error(t("toastLongLimit"));
-            }
+            const delayValidation = SchedulerUtils.validateDelay(message.delayMs);
+            if (!delayValidation.ok) throw new Error(delayValidation.error);
+
+            const id = SchedulerUtils.createMessageId();
+            const when = Date.now() + message.delayMs;
 
             scheduledMessages[id] = {
                 id,
@@ -278,10 +286,17 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const msg = scheduledMessages[message.id];
         if (msg && msg.status === "scheduled") {
             try {
+                const textValidation = SchedulerUtils.validateMessageText(message.text);
+                if (!textValidation.ok) throw new Error(textValidation.error);
+                if (message.delayMs !== undefined) {
+                    const delayValidation = SchedulerUtils.validateDelay(message.delayMs);
+                    if (!delayValidation.ok) throw new Error(delayValidation.error);
+                }
+
                 const oldSendAt = msg.sendAt;
                 
                 msg.text = message.text;
-                if (message.delayMs) {
+                if (message.delayMs !== undefined) {
                     msg.delayMs = message.delayMs;
                     msg.sendAt = Date.now() + message.delayMs;
 

@@ -1,0 +1,13 @@
+{
+  "name": "whatsapp-message-scheduler",
+  "version": "1.0.1",
+  "private": true,
+  "description": "Development checks for the WhatsApp Message Scheduler extension",
+  "scripts": {
+    "check": "node --check background.js && node --check content-script.js && node --check scheduler-utils.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

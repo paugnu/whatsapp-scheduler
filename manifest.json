@@ -18,6 +18,7 @@
   ],
   "background": {
     "scripts": [
+      "scheduler-utils.js",
       "background.js"
     ],
     "persistent": true
